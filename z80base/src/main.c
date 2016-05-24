@@ -132,6 +132,7 @@ initterm(void)
 static void
 command(z80info *z80)
 {
+    char * retval;
     int i, j, t, e;
     char str[256], *s;
     FILE *fp;
@@ -147,10 +148,16 @@ loop:    /* "infinite" loop */
     printf("Cmd: ");
     fflush(stdout);
     *str = '\0';
-    fgets(str, sizeof str - 1, stdin);
+    retval = fgets(str, sizeof str - 1, stdin);
 
     for (s = str; *s == ' ' || *s == '\t'; s++)
         ;
+
+    /* if ctrl-d was hit, inject a 'q' to quit */
+    if( retval == NULL )
+    {
+	s[0] = 'q';
+    }
 
     switch (isupper(*s) ? tolower(*s) : *s)
     {
@@ -158,7 +165,11 @@ loop:    /* "infinite" loop */
         printf("   Q(uit)  T(race on/off)  S(tep trace)  D(ump regs)\n");
         printf("   E(xamine memory)  P(oke memory)  R(egister modify)\n");
         printf("   L(oad binary)  C(ontinue running - <CR> if Step)\n");
-        printf("   G(o) B(oot CP/M)  Z(80 disassembled dump)\n");
+        printf("   G(o) ");
+#ifdef BUILD_CPM
+        printf(         "B(oot CP/M) ");
+#endif
+        printf(                      " Z(80 disassembled dump)\n");
         printf("   W(write memory to file)  X,Y(-set/clear breakpoint)\n");
         printf("   O(output to \"logfile\")\n\n");
         printf("   !(fork shell)  ?(command list)  V(ersion)\n\n");
@@ -210,11 +221,13 @@ loop:    /* "infinite" loop */
         printf("  Version %s\n", VERSION);
         break;
 
+#ifdef BUILD_CPM
     case 'b':                /* boot cp/m */
         setterm();
         sysreset(z80);
         return;
         break;
+#endif
 
     case 't':                /* toggle trace mode */
         z80->trace = !z80->trace;
@@ -903,12 +916,14 @@ haltcpu(z80info *z80)
             command(z80);
     }
 
+#ifdef BUILD_CPM
     /* a CP/M syscall - done here so tracing still works */
     if (z80->syscall)
     {
         z80->syscall = FALSE;
         bios(z80, z80->biosfn);
     }
+#endif
 }
 
 word
@@ -1024,7 +1039,9 @@ interrupt(int s)
 int
 main(int argc, const char *argv[])
 {
+#ifdef BUILD_CPM
     const char *s;
+#endif
 
     z80 = new_z80info();
 
@@ -1081,6 +1098,7 @@ main(int argc, const char *argv[])
 
     setterm();
 
+#ifdef BUILD_CPM
     /* if we had an argument on the command line, try to load that file &
        immediately execute the z80  --  otherwise go to the command level */
     if (strcmp(argv[0], "cpm") == 0 ||
@@ -1091,6 +1109,7 @@ main(int argc, const char *argv[])
     }
     else
     {
+#endif
         if (argc <= 1)
             command(z80);
 
@@ -1101,7 +1120,9 @@ main(int argc, const char *argv[])
             resetterm();
             return -2;
         }
+#ifdef BUILD_CPM
     }
+#endif
 
     while (1)
     {

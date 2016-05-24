@@ -11,7 +11,7 @@
 #include <stdio.h>
 
 /* the current version of the z80 emulator */
-#define VERSION "3.1"
+#define VERSION "3.1.1 (A)"
 
 
 /* system definitions */
@@ -148,6 +148,7 @@ typedef struct z80info
     int syscall;	/* CP/M syscall to be done */
     int biosfn;		/* BIOS function be done */
 
+#ifdef BUILD_CPM
     /* these are for the CP/M BIOS */
     int	drive;
     word dma;
@@ -155,6 +156,7 @@ typedef struct z80info
     word sector;
     FILE *drives[MAXDISCS];
     long drivelen[MAXDISCS];
+#endif
 
     /* 64k bytes - may be allocated separately if desired */
     byte mem[0x10000L];
@@ -270,9 +272,11 @@ extern word write_mem(z80info *z80, word addr, byte val);
 extern void undefinstr(z80info *z80, byte instr);
 extern boolean loadfile(z80info *z80, const char *fname);
 
+#ifdef BUILD_CPM
 /* bios.c */
 extern void bios(z80info *z80, int fn);
 extern void sysreset(z80info *z80);
+#endif
 
 /* disassem.c */
 extern int disassemlen(z80info *z80);

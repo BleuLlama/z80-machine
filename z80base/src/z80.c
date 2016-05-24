@@ -2033,11 +2033,13 @@ init_z80info(z80info *z80)
 	z80->sig = 0;
 	z80->syscall = FALSE;
 
+#ifdef BUILD_CPM
 	/* initialize the CP/M BIOS data */
 	z80->drive = 0;
 	z80->dma = 0x80;
 	z80->track = 0;
 	z80->sector = 1;
+#endif
 
 	/* initialize the global parity array if necessary */
 	if (!parity_inited)
