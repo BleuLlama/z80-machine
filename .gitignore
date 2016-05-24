@@ -1,3 +1,7 @@
 src/*.o
+*.o
 bin/
+ROMs
 drives/A-Hdrive
+reference/
+notes.txt
