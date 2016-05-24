@@ -145,3 +145,12 @@ Version history:
       copyrighted CP/M 2.2.
       Added date/time support for P2DOS and its utilities.
 
+--------------------------------------------------------------------------------
+
+2016-05-23 Notes by Scott Lawrence <yorgle@gmail.com>
+
+This project directory has been left alone as much as possible.  I
+did make some tweaks to let it build more cleanly (compiler warnings
+removed by tweaking code or adding compiler flags).  I also added
+-DBUILD_CPM so that derivative works can be built without including
+the CPM additions as they were provided.

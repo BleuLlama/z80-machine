@@ -12,7 +12,9 @@ MAC = ./mac
 DRIVES = ./drives
 UTILS = ./utils
 CC = gcc
-CFLAGS = -O2 -pipe -Wall -DPOSIX_TTY -DLITTLE_ENDIAN -DMEM_BREAK -ansi
+CFLAGS = -O2 -pipe -Wall -DPOSIX_TTY -DLITTLE_ENDIAN -DMEM_BREAK \
+	 -Wno-pointer-sign -Wno-int-to-pointer-cast -DBUILD_CPM
+OLD_CFLAGS = -ansi
 LDFLAGS = 
 
 FILES = README Makefile $(MAC)/MacProj.hqx z80.proj \
@@ -26,6 +28,11 @@ OBJS =	$(SRC)/bios.o \
 	$(SRC)/disassem.o \
 	$(SRC)/main.o \
 	$(SRC)/z80.o
+
+all: dirs cpm z80
+
+dirs:
+	-mkdir bin
 
 cpm: $(BIN)/cpm
 

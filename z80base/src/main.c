@@ -52,7 +52,10 @@ static FILE *logfile = NULL;
 #    define termio termios
 /* #    define TCGETA  TIOCGETA */
 #endif
-static struct termio rawterm, oldterm;    /* for raw terminal I/O */
+struct termio;    /* for raw terminal I/O */
+#ifdef TCGETA
+static struct rawterm, oldterm;    /* for raw terminal I/O */
+#endif
 static int keybd = -1;            /* to check keyboard for data */
 #endif
 
