@@ -1,0 +1,18 @@
+# program space
+begin program
+0x0000  0x2000  rc2014.rom	program_1
+end
+
+# graphics roms
+begin graphics
+end
+
+# color proms
+begin color
+end
+
+# sound proms
+begin sound
+end
+
+
