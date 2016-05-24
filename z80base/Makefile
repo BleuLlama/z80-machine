@@ -3,32 +3,35 @@ TARG := z80emu
 
 BIN ?= ./bin
 SRC := ./src
+ORIGSRC := ../z80orig/src
 CC := gcc
 CFLAGS := -O2 -pipe -Wall -DPOSIX_TTY -DLITTLE_ENDIAN -DMEM_BREAK \
-	 -Wno-pointer-sign -Wno-int-to-pointer-cast 
+	  -I$(ORIGSRC) \
+	  -Wno-pointer-sign -Wno-int-to-pointer-cast 
 LDFLAGS := 
 
 OBJS :=	\
-	$(SRC)/disassem.o \
-	$(SRC)/main.o \
-	$(SRC)/z80.o
+	build/disassem.o \
+	build/main.o \
+	build/z80.o
 
 all: dirs $(TARG)
 
 dirs:
+	@-mkdir build 2>&1
 	@-mkdir bin 2>&1
 
 $(TARG): $(BIN)/$(TARG)
 
-$(BIN)/$(TARG): $(OBJS)
+$(BIN)/$(TARG): dirs $(OBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJS)
 
-z80.o:		$(SRC)/defs.h $(SRC)/z80.c
-disassem.o:	$(SRC)/defs.h $(SRC)/disassem.c
-main.o:		$(SRC)/defs.h $(SRC)/main.c
+build/z80.o:		$(ORIGSRC)/defs.h $(ORIGSRC)/z80.c
+build/disassem.o:	$(ORIGSRC)/defs.h $(ORIGSRC)/disassem.c
+build/main.o:		$(ORIGSRC)/defs.h $(ORIGSRC)/main.c
 
 clean:
-	-rm -f $(BIN)/$(TARG) $(SRC)/*.o
+	-rm -f $(BIN)/$(TARG) build/
 
 .PHONY: $(TARG)
 
