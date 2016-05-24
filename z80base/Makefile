@@ -1,7 +1,8 @@
 
 TARG := z80emu
 
-BIN ?= ./bin
+BUILD := ./build
+BIN := ./bin
 SRC := ./src
 ORIGSRC := ../z80orig/src
 CC := gcc
@@ -10,28 +11,33 @@ CFLAGS := -O2 -pipe -Wall -DPOSIX_TTY -DLITTLE_ENDIAN -DMEM_BREAK \
 	  -Wno-pointer-sign -Wno-int-to-pointer-cast 
 LDFLAGS := 
 
-OBJS :=	\
-	build/disassem.o \
-	build/main.o \
-	build/z80.o
+SRCS := \
+	$(ORIGSRC)/z80.c \
+	$(ORIGSRC)/disassem.c \
+	$(ORIGSRC)/main.c
 
-all: dirs $(TARG)
+OBJS := $(addprefix $(BUILD)/, $(notdir $(SRCS:%.c=%.o) ) )
+
+all: dirs $(BIN)/$(TARG)
 
 dirs:
-	@-mkdir build 2>&1
-	@-mkdir bin 2>&1
+	@-mkdir $(BUILD) 2>&1
+	@-mkdir $(BIN) 2>&1
 
 $(TARG): $(BIN)/$(TARG)
 
 $(BIN)/$(TARG): dirs $(OBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJS)
 
-build/z80.o:		$(ORIGSRC)/defs.h $(ORIGSRC)/z80.c
-build/disassem.o:	$(ORIGSRC)/defs.h $(ORIGSRC)/disassem.c
-build/main.o:		$(ORIGSRC)/defs.h $(ORIGSRC)/main.c
+$(BUILD)/z80.o:		$(ORIGSRC)/defs.h $(ORIGSRC)/z80.c
+$(BUILD)/disassem.o:	$(ORIGSRC)/defs.h $(ORIGSRC)/disassem.c
+$(BUILD)/main.o:	$(ORIGSRC)/defs.h $(ORIGSRC)/main.c
+
+$(BUILD)/%.o: $(ORIGSRC)/%.c
+	$(CC) $(CFLAGS) -c -o $@ $<
 
 clean:
-	-rm -f $(BIN)/$(TARG) build/
+	-rm -rf $(BIN)/ $(BUILD)/
 
 .PHONY: $(TARG)
 
