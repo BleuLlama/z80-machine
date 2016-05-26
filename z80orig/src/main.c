@@ -153,6 +153,9 @@ command(z80info *z80)
     FILE *fp;
     static word pe = 0;
     static word po = 0;
+#ifdef AUTORUN
+    static char firstrun = 1;
+#endif
 
     resetterm();
     printf("\n");
@@ -163,7 +166,21 @@ loop:    /* "infinite" loop */
     printf("Cmd: ");
     fflush(stdout);
     *str = '\0';
-    retval = fgets(str, sizeof str - 1, stdin);
+
+#ifdef AUTORUN
+    if( firstrun == 1 ) {
+	/* first time we're run, inject "g\n" */
+	str[0] = 'g';
+	str[1] = '\r';
+	retval = str;
+	firstrun = 0;
+    } else {
+#endif
+	retval = fgets(str, sizeof str - 1, stdin);
+#ifdef AUTORUN
+    }
+#endif
+
 
     for (s = str; *s == ' ' || *s == '\t'; s++)
         ;
@@ -1146,6 +1163,7 @@ main(int argc, const char *argv[])
     else
     {
 #endif
+
         if (argc <= 1)
             command(z80);
 
