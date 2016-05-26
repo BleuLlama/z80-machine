@@ -8,13 +8,17 @@ ORIGSRC := ../z80orig/src
 CC := gcc
 CFLAGS := -O2 -pipe -Wall -DPOSIX_TTY -DLITTLE_ENDIAN -DMEM_BREAK \
 	  -I$(ORIGSRC) \
+	  -DEXTERNAL_IO -DEXTERNAL_MEM \
+	  -DSYSTEM_POLL \
 	  -Wno-pointer-sign -Wno-int-to-pointer-cast 
 LDFLAGS := 
+
 
 SRCS := \
 	$(ORIGSRC)/z80.c \
 	$(ORIGSRC)/disassem.c \
-	$(ORIGSRC)/main.c
+	$(ORIGSRC)/main.c \
+	$(SRC)/iomem.c 
 
 OBJS := $(addprefix $(BUILD)/, $(notdir $(SRCS:%.c=%.o) ) )
 
@@ -32,8 +36,13 @@ $(BIN)/$(TARG): dirs $(OBJS)
 $(BUILD)/z80.o:		$(ORIGSRC)/defs.h $(ORIGSRC)/z80.c
 $(BUILD)/disassem.o:	$(ORIGSRC)/defs.h $(ORIGSRC)/disassem.c
 $(BUILD)/main.o:	$(ORIGSRC)/defs.h $(ORIGSRC)/main.c
+$(BUILD)/iomem.o:	$(ORIGSRC)/defs.h $(SRC)/iomem.c
+
 
 $(BUILD)/%.o: $(ORIGSRC)/%.c
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(BUILD)/%.o: $(SRC)/%.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 clean:
