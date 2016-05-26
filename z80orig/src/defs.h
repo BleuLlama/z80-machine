@@ -168,12 +168,46 @@ typedef struct z80info
 #endif
 } z80info;
 
+/* These are headers used if certain compile flags are set, for 
+   external expansion of the core 
+*/
+
+/* If we need to do polling before each opcode is run... */
+#ifdef SYSTEM_POLL
+void system_init( z80info * z80 ); /* called when z80 struct is created */
+void system_poll( z80info * z80 ); /* called every opcode */
+#endif
+
+/* If external mem is to be included, we need these protos */
+#ifdef EXTERNAL_MEM
+void mem_init( z80info *z80 );
+word mem_read( z80info * z80, word addr );
+word mem_write( z80info * z80, word addr, byte val );
+#endif
+
+/* If external IO is to be included, we need these protos */
+#ifdef EXTERNAL_IO
+void io_init( z80info *z80 );
+void io_output( z80info *z80, byte haddr, byte laddr, byte data );
+void io_input( z80info *z80, byte haddr, byte laddr, byte *val );
+#endif
+
+
 
 /* All the following macros assume that a variable named "z80" is
    available to access the above info.  This is to allow multiple
    z80s to run without stepping on each other.
 */
 
+#ifdef EXTERNAL_MEM
+    /* we use the external mem_*() functions */
+    #define Z80MEMREAD( A ) 	 mem_read( z80, (word)(A) )
+    #define Z80MEMWRITE( A, V )  mem_write( z80, (word)(A), (byte)(V) )
+#else
+    /* we use the internal direct access */
+    #define Z80MEMREAD( A ) 	 z80->mem[(word)(A)]
+    #define Z80MEMWRITE( A, V )  (z80->mem[(word)(A)] = (byte)(V))
+#endif
 
 /* These macros allow memory-mapped I/O if MEM_BREAK is defined.
    Because of this, these macros must be very carefully used, and
@@ -186,11 +220,11 @@ typedef struct z80info
 #    define MEM(addr)	\
 		(z80->membrk[(word)(addr)] ?	\
 		read_mem(z80, addr) :	\
-		z80->mem[(word)(addr)])
+		Z80MEMREAD( addr ) )
 #    define SETMEM(addr, val)	\
 		(z80->membrk[(word)(addr)] ?	\
 		write_mem(z80, addr, val) :	\
-		(z80->mem[(word)(addr)] = (byte)(val)))
+		Z80MEMWRITE( addr, val ) )
 
 	/* various flags for "membrk" - others may be added */
 #	define M_BREAKPOINT	0x01		/* breakpoint */
@@ -199,8 +233,10 @@ typedef struct z80info
 #	define M_MEM_MAPPED_IO	0x08		/* memory-mapped I/O addr */
 
 #else
-#    define MEM(addr) z80->mem[(word)(addr)]
-#    define SETMEM(addr, val) (z80->mem[(word)(addr)] = (byte)(val))
+//#    define MEM(addr)         z80->mem[(word)(addr)]
+//#    define SETMEM(addr, val) (z80->mem[(word)(addr)] = (byte)(val))
+#    define MEM(addr)         Z80MEMREAD( addr )
+#    define SETMEM(addr, val) Z80MEMWRITE( addr, val )
 #endif
 
 

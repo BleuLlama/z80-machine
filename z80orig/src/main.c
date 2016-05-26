@@ -18,6 +18,21 @@
 
 #include "defs.h"
 
+/* If external IO is to be included, we need these protos */
+#ifdef EXTERNAL_IO
+void io_init( z80info *z80 );
+void io_output( z80info *z80, byte haddr, byte laddr, byte data );
+void io_input( z80info *z80, byte haddr, byte laddr, byte *val );
+#endif
+
+/* If external mem is to be included, we need these protos */
+#ifdef EXTERNAL_MEM
+void mem_init( z80info *z80 );
+word mem_read( z80info * z80, word addr );
+word mem_write( z80info * z80, word addr, byte val );
+#endif
+
+
 #if defined macintosh
 #    include <Types.h>
 #    include <Events.h>
@@ -744,6 +759,9 @@ loadfile(z80info *z80, const char *fname)
 boolean
 input(z80info *z80, byte haddr, byte laddr, byte *val)
 {
+#ifdef EXTERNAL_IO
+    io_input( z80, haddr, laddr, val );
+#else
     static int last = 0;    /* the last character read from the tty */
     int data;
 
@@ -839,6 +857,7 @@ input(z80info *z80, byte haddr, byte laddr, byte *val)
         break;
     }
 
+#endif
     return TRUE;
 }
 
@@ -852,6 +871,9 @@ input(z80info *z80, byte haddr, byte laddr, byte *val)
 void
 output(z80info *z80, byte haddr, byte laddr, byte data)
 {
+#ifdef EXTERNAL_IO
+    io_output( z80, haddr, laddr, data );
+#else
     if (laddr == 0xFF) {
         /* BIOS call - interrupt the z80 before the next instruction
            since we may have to mess with the PC & other stuff -
@@ -879,6 +901,7 @@ output(z80info *z80, byte haddr, byte laddr, byte data)
         /* dump the data for our user */
         printf("OUTPUT: addr = %X%X  DATA = %X\r\n", haddr, laddr,data);
     }
+#endif
 }
 
 
@@ -952,7 +975,7 @@ read_mem(z80info *z80, word addr)
     command(z80);
 #endif    /* MEM_BREAK */
 
-    return z80->mem[addr];
+    return Z80MEMREAD( addr );
 }
 
 word
@@ -982,7 +1005,7 @@ write_mem(z80info *z80, word addr, byte val)
     command(z80);
 #endif    /* MEM_BREAK */
 
-    return z80->mem[addr] = val;
+    return Z80MEMWRITE( addr, val );
 }
 
 void
@@ -1048,7 +1071,20 @@ main(int argc, const char *argv[])
     if (z80 == NULL)
         return -1;
 
+#ifdef SYSTEM_POLL
+    system_init( z80 );
+#endif
+
+
     initterm();
+
+#ifdef EXTERNAL_IO
+    io_init( z80 );
+#endif
+#ifdef EXTERNAL_MEM
+    mem_init( z80 );
+#endif
+    
 
 #if defined BeBox_TurnedOff
     /* try to open the keyboard for non-blocking read */

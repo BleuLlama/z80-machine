@@ -174,6 +174,9 @@ z80_emulator(z80info *z80, int count)
 
 	/* main loop  --  all "goto"s eventually end up here */
 infloop:
+#ifdef SYSTEM_POLL
+	system_poll( z80 );
+#endif
 
 	/* only execute "count" instructions at one whack */
 	if (count-- <= 0)
