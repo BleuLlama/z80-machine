@@ -9,6 +9,7 @@ ROMDIRS := \
 	lloader \
 	basic.32 \
 	basic.56 \
+	smalltest \
 	iotest
 
 
