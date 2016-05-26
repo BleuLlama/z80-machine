@@ -27,7 +27,8 @@ have one very important thing, and that's an encapsulated Z80 in a
 structure.  This project also allowed for protected memory, and all
 of the RAM access interface that I need. Although the interface to
 it is VERY intertwined with emulating a CP/M computer, which is
-fine.
+fine.  It also has an excellent manager/monitor with disassembler
+which is awesome
 
 My goals with this project are to emulate the RC2014 Z80 computer
 as it currently exists, then to emulate a RC2014/LL expanded computer
@@ -39,10 +40,54 @@ platform, which is where this project started from.
 ## Project milestones
 
 1. oubiwann-z80 project is going to be ingested, and shifted to be 
-   in a subdirectory
+   in a subdirectory (DONE)
 2. The project gets a new Makefile and main.c that handles IO
 3. ASM generation of a simple IO tester application
 4. Implementation of IO routines for the RC2014/SBC Intel BASIC ROMs
+
+## New compile-time defines, hooks
+
+I tried to be as minimally invasive into the original source code as
+possible, and to accomplish this, I use a series of DEFINEs that 
+enable the various hooks and behaviors in the code. I'll list out
+the additions here.  They can be seen in action in the z80base and 
+rc2014 sub-projects.
+
+AUTORUN
+
+> This will automatically inject (g)(return) into the startup
+> of the system. This will effectively tell the host monitor to
+> just start executing the emulator.  You can still ctrl-c out 
+> of the emulator into the monitor.
+
+SYSTEM\_POLL
+
+> This will enable two function calls:  system\_init() which gets called
+> at system initialization time, immediately after the "z80" structure
+> is populated.  Second is system\_poll() which will get called 
+> immediately before the current opcode is parsed and performed.
+
+EXTERNAL\_IO
+
+> This enables three function calls: io\_init() which gets called at 
+> system startup time.  io\_output() gets called when any OUT opcode
+> is performed.  It is passed the address and data to be outputted. 
+> io\_input() gets called when any IN optcode is performed.  It 
+> needs to fill in the 'val' parameter with the appropriate value.
+
+EXTERNAL\_MEM
+
+> This enables three function calls: mem\_init() which gets called at 
+> system startup time.  mem\_read() gets called when the CPU reads 
+> any memory (opcodes or data).  It needs to return the appropriate 
+> value.  mem\_write() gets called whenever the CPU writes to memory.
+
+> NOTE: This does not get called when the monitor is looking through
+> or disassembling memory.  Make sure that the 'mem' buffer in the
+> z80 structure contains the most up-to-date version of what the 
+> CPU should see, as the monitor uses that representation of memory
+> directly.
+
 
 ## Support tools
 
@@ -71,7 +116,12 @@ https://code.google.com/archive/p/bleu-romtools/
     -  cleanups for modern compilers
 
 - z80base/
-     -  A basic z80 emulator using the "orig" code, but with no CPM support
+    -  A basic z80 emulator using the "orig" code, but with no CPM support
+    -  This also uses most of the new hooks and such
+
+- rc2014/
+    - Using all the hooks and the AUTORUN flag, it emulates RC2014 computer
+     
 
 ## Source credits
 
