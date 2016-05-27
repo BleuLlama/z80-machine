@@ -88,6 +88,10 @@ EXTERNAL\_MEM
 > CPU should see, as the monitor uses that representation of memory
 > directly.
 
+RAW\_TERM
+
+> This flag will disable the core functions' call to muck about 
+> with the termcap and ioctls and all of that fancy stuff.
 
 ## Support tools
 
