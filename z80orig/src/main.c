@@ -109,6 +109,7 @@ setterm(void)
 static void
 initterm(void)
 {
+#ifndef RAW_TERM
 #ifdef TCGETA
     /* try to setup the terminal into raw mode */
     if (ioctl(0, TCGETA, &oldterm) < 0
@@ -133,6 +134,7 @@ initterm(void)
     rawterm.c_cc[VKILL] = -1;
     rawterm.c_cc[VMIN] = 1;        /* MIN number of chars */
     rawterm.c_cc[VTIME] = 0;    /* TIME timeout value */
+#endif
 #endif
 }
 
@@ -180,7 +182,6 @@ loop:    /* "infinite" loop */
 #ifdef AUTORUN
     }
 #endif
-
 
     for (s = str; *s == ' ' || *s == '\t'; s++)
         ;
