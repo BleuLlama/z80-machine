@@ -46,7 +46,13 @@ DEL     = 0x7F             ; Delete
 
 ; BASIC WORK SPACE LOCATIONS
 
+.if( do32k )
 WRKSPC  = 0x8045             ; BASIC Work space
+.endif
+.if( do56k )
+WRKSPC  = 0x2045             ; BASIC Work space
+.endif
+
 USR     = WRKSPC+0x3           ; "USR (x)" jump
 OUTSUB  = WRKSPC+0x6           ; "out p,n"
 OTPORT  = WRKSPC+0x7           ; Port (p)

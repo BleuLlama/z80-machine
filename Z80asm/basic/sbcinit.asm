@@ -16,6 +16,8 @@
 	.module	RC2014INT
 .area		.CODE(ABS)
 
+.include "config.asm"
+
 ; Minimum 6850 ACIA interrupt driven serial I/O to run modified NASCOM Basic 4.7
 ; Full input buffering with incoming data hardware handshaking
 ; Handshake shows full before the buffer is totally filled to allow run-on from the sender
@@ -27,12 +29,22 @@ SER_EMPTYSIZE   = 0x05
 RTS_HIGH        = 0x0D6
 RTS_LOW         = 0x096
 
+; settings for 32k ROM
+.if( do32k )
 serBuf          = 0x8000
+TEMPSTACK       = 0x80ED ; Top of BASIC line input buffer so is "free ram" when BASIC resets
+.endif
+
+; settings for 56k ROM
+.if( do56k )
+serBuf          = 0x2000
+TEMPSTACK       = 0x20ED ; Top of BASIC line input buffer so is "free ram" when BASIC resets
+.endif
+
 serInPtr        = serBuf+SER_BUFSIZE
 serRdPtr        = serInPtr+2
 serBufUsed      = serRdPtr+2
 basicStarted    = serBufUsed+1
-TEMPSTACK       = 0x80ED ; Top of BASIC line input buffer so is "free ram" when BASIC resets
 
 CR              = 0x0D
 LF              = 0x0A
