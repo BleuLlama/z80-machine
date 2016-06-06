@@ -10,6 +10,7 @@ ROMDIRS := \
 	basic.32 \
 	basic.56 \
 	smalltest \
+	aciatest \
 	iotest
 
 
