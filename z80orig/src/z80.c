@@ -200,6 +200,7 @@ infloop:
 
 		if (RESET)		/* RESET "line" has been "pulled" */
 		{
+printf( "RESET\n" );
 			IFF = 0;
 			IFF2 = 0;
 			I = 0;
@@ -212,6 +213,7 @@ infloop:
 		}
 		else if (NMI)			/* non-maskable interrupt */
 		{
+printf( "NMI\n" );
 			--SP;
 			SETMEM(SP, PC >> 8);
 			--SP;
@@ -224,10 +226,12 @@ infloop:
 		}
 		else if (INTR && IFF)	/* normal masked interrupt */
 		{
+printf(" INTR IFF   IM%d\n", IMODE );
 			/* we have three interrupt modes in the z80 */
 			switch (IMODE)
 			{
 				case 0:			/* 8080-mode -- this is NOT correct */
+printf( " INT IM0\n" );
 					/* get the next instruction from the interrupting
 					   device - this may be more than one byte but we
 					   cannot handle that yet */
@@ -235,7 +239,9 @@ infloop:
 					t = INTR;
 					break;
 				case 1:			/* like a "rst" to 0x38 */
+printf( " INT IM1\n" );
 				default:
+printf( "Calling ISR at 0x38\n" );
 					--SP;
 					SETMEM(SP, PC >> 8);
 					--SP;
@@ -243,6 +249,7 @@ infloop:
 					PC = 0x38;
 					break;
 				case 2:	/* most powerful/flexible mode */
+printf( " INT IM2\n" );
 					--SP;
 					SETMEM(SP, PC >> 8);
 					--SP;
@@ -256,8 +263,10 @@ infloop:
 			IFF = IFF2 = 0;
 			INTR = 0;
 		}
-		else if (INTR)			/* try again the next time around */
+		else if (INTR) {
+			/* try again the next time around */
 			EVENT = TRUE;
+		}
 
 		/* get the next opcode to execute if we do not have it yet */
 		if (i)

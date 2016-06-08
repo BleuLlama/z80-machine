@@ -53,6 +53,11 @@ word mem_write( z80info * z80, word addr, byte val );
 #    endif
 #endif
 
+#ifndef TCGETA
+#define TCGETA TIOCGETA
+#endif
+
+
 #define INTR_CHAR    31    /* control-underscore */
 
 extern int errno;
@@ -67,9 +72,11 @@ static FILE *logfile = NULL;
 #    define termio termios
 /* #    define TCGETA  TIOCGETA */
 #endif
+
 struct termio;    /* for raw terminal I/O */
 #ifdef TCGETA
-static struct rawterm, oldterm;    /* for raw terminal I/O */
+struct termios rawterm;    /* for raw terminal I/O */
+struct termios oldterm;    /* for raw terminal I/O */
 #endif
 static int keybd = -1;            /* to check keyboard for data */
 #endif
@@ -79,13 +86,16 @@ static void dumptrace(z80info *z80);
 
 
 
+
 /*-----------------------------------------------------------------------*\
- |  resetterm  --  reset terminal characteristics to original settings
+ |  z_resetterm  --  reset terminal characteristics to original settings
 \*-----------------------------------------------------------------------*/
 
 void
-resetterm(void)
+z_resetterm(void)
 {
+    tcflush(0, TCIFLUSH);
+    tcsetattr( 0, TCSANOW, &oldterm);
 }
 
 
@@ -95,21 +105,51 @@ resetterm(void)
 \*-----------------------------------------------------------------------*/
 
 void
-setterm(void)
+z_setterm(void)
 {
+    tcflush(0, TCIFLUSH);
+    tcsetattr(0, TCSADRAIN, &rawterm);
 }
 
 
 
 /*-----------------------------------------------------------------------*\
- |  initterm  --  initialize terminal stuff  --  called once on startup
+ |  z_initterm  --  initialize terminal stuff  --  called once on startup
  |  and then after returning from a sub-shell
 \*-----------------------------------------------------------------------*/
 
 static void
-initterm(void)
+z_initterm(void)
 {
-#ifndef RAW_TERM
+    tcgetattr(0, &oldterm);
+    tcgetattr(0, &rawterm);
+
+    //rawterm = oldterm;
+
+    rawterm.c_lflag &= ~(ICANON | ECHO);
+    rawterm.c_iflag &= ~(IXON | IXANY | IXOFF);
+    //rawterm.c_iflag &= ~(IGNCR | ICRNL | INLCR);
+    //rawterm.c_oflag &= ~(ONLCR | OCRNL);
+    rawterm.c_iflag |= ICRNL;
+
+    /* these are common for all UNIX's nowadays */
+    rawterm.c_cc[VMIN] = 1;
+    rawterm.c_cc[VSUSP] = 0;
+    rawterm.c_cc[VINTR] = INTR_CHAR;  /* ctrl-_ */
+
+    /* some newer ones from BSD's */
+#ifdef VDSUSP
+    rawterm.c_cc[VDSUSP] = 0;
+#endif
+#ifdef VDISCARD
+    rawterm.c_cc[VDISCARD] = 0;
+#endif
+#ifdef VLNEXT
+    rawterm.c_cc[VLNEXT] = 0;
+#endif
+
+
+#ifdef NEVER /* this is the original stuff. */
 #ifdef TCGETA
     /* try to setup the terminal into raw mode */
     if (ioctl(0, TCGETA, &oldterm) < 0
@@ -159,7 +199,7 @@ command(z80info *z80)
     static char firstrun = 1;
 #endif
 
-    resetterm();
+    z_resetterm();
     printf("\n");
 
 loop:    /* "infinite" loop */
@@ -178,7 +218,9 @@ loop:    /* "infinite" loop */
 	firstrun = 0;
     } else {
 #endif
+
 	retval = fgets(str, sizeof str - 1, stdin);
+
 #ifdef AUTORUN
     }
 #endif
@@ -239,7 +281,7 @@ loop:    /* "infinite" loop */
 
     case '!':                /* fork a shell */
         system("exec ${SHELL:-/bin/sh}");
-        initterm();
+        z_initterm();
         printf("\n");
         break;
 
@@ -256,7 +298,7 @@ loop:    /* "infinite" loop */
 
 #ifdef BUILD_CPM
     case 'b':                /* boot cp/m */
-        setterm();
+        z_setterm();
         sysreset(z80);
         return;
         break;
@@ -517,7 +559,7 @@ loop:    /* "infinite" loop */
     case 'c':            /* continue z80 execution */
     case 'g':
     cont:
-        setterm();
+        z_setterm();
 
         if (z80->trace)
         {
@@ -866,11 +908,11 @@ input(z80info *z80, byte haddr, byte laddr, byte *val)
 
     /* default - prompt the user for an input byte */
     default:
-        resetterm();
+        z_resetterm();
         printf("INPUT : addr = %X%X    DATA = ", haddr, laddr);
         fflush(stdout);
         scanf("%x", &data);
-        setterm();
+        z_setterm();
         *val = data;
         break;
     }
@@ -1045,7 +1087,7 @@ static void
 quit(int sig)
 {
     printf("\r\nCaught signal %d.\r\n", sig);
-    resetterm();
+    z_resetterm();
     exit(2);
 }
 
@@ -1093,8 +1135,7 @@ main(int argc, const char *argv[])
     system_init( z80 );
 #endif
 
-
-    initterm();
+    z_initterm();
 
 #ifdef EXTERNAL_IO
     io_init( z80 );
@@ -1150,7 +1191,7 @@ main(int argc, const char *argv[])
     signal(SIGINT, interrupt);
 #endif
 
-    setterm();
+    z_setterm();
 
 #ifdef BUILD_CPM
     /* if we had an argument on the command line, try to load that file &
@@ -1172,7 +1213,7 @@ main(int argc, const char *argv[])
         {
             /* cannot load it - exit */
             fprintf(stderr, "Cannot load file %s!\r\n", argv[1]);
-            resetterm();
+            z_resetterm();
             return -2;
         }
 #ifdef BUILD_CPM

@@ -298,8 +298,8 @@ extern void delete_z80info(z80info *z80);
 extern boolean z80_emulator(z80info *z80, int count);
 
 /* main.c */
-extern void resetterm(void);
-extern void setterm(void);
+extern void z_resetterm(void);
+extern void z_setterm(void);
 extern boolean input(z80info *z80, byte haddr, byte laddr, byte *val);
 extern void output(z80info *z80, byte haddr, byte laddr, byte data);
 extern void haltcpu(z80info *z80);
