@@ -11,6 +11,7 @@ CFLAGS := -O2 -pipe -Wall -DPOSIX_TTY -DLITTLE_ENDIAN -DMEM_BREAK \
 	  -I$(ORIGSRC) -I$(COMMONSRC) -I$(SRC) \
 	  -DEXTERNAL_IO -DEXTERNAL_MEM \
 	  -DSYSTEM_POLL \
+	  -Wall -pedantic \
 	  -Wno-pointer-sign -Wno-int-to-pointer-cast 
 
 UNUSED_CFLAGS := -DAUTORUN -DRAW_TERM
@@ -22,6 +23,7 @@ SRCS := \
 	$(ORIGSRC)/disassem.c \
 	$(ORIGSRC)/main.c \
 	$(COMMONSRC)/memregion.c \
+	$(COMMONSRC)/mc6850_console.c \
 	$(SRC)/iomem.c 
 
 OBJS := $(addprefix $(BUILD)/, $(notdir $(SRCS:%.c=%.o) ) )
@@ -43,6 +45,7 @@ $(BUILD)/disassem.o:	$(ORIGSRC)/defs.h $(ORIGSRC)/disassem.c
 $(BUILD)/main.o:	$(ORIGSRC)/defs.h $(ORIGSRC)/main.c
 $(BUILD)/iomem.o:	$(ORIGSRC)/defs.h $(SRC)/iomem.c
 $(BUILD)/memregion.o:	$(ORIGSRC)/defs.h $(COMMONSRC)/memregion.c
+$(BUILD)/m6850_console.o:	$(ORIGSRC)/defs.h $(COMMONSRC)/6850_console.c
 
 
 $(BUILD)/%.o: $(ORIGSRC)/%.c

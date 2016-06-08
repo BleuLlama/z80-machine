@@ -99,6 +99,30 @@ z_resetterm(void)
 }
 
 
+/*-----------------------------------------------------------------------*\
+ |  z_kbhit  --  was a key hit (for active mode )
+ |   (snagged from some online code - SDL)
+\*-----------------------------------------------------------------------*/
+
+#ifndef STDIN_FILENO
+#define STDIN_FILENO (0)
+#endif
+
+int
+z_kbhit(void)
+{
+    struct timeval tv;
+
+    fd_set fds;
+    tv.tv_sec = 0;
+    tv.tv_usec = 0;
+    FD_ZERO(&fds);
+    FD_SET(STDIN_FILENO, &fds); //STDIN_FILENO is 0
+    select(STDIN_FILENO+1, &fds, NULL, NULL, &tv);
+
+    return( FD_ISSET(STDIN_FILENO, &fds) );
+}
+
 
 /*-----------------------------------------------------------------------*\
  |  setterm  --  set terminal characteristics to raw mode

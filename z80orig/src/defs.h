@@ -298,13 +298,17 @@ extern void delete_z80info(z80info *z80);
 extern boolean z80_emulator(z80info *z80, int count);
 
 /* main.c */
-extern void z_resetterm(void);
-extern void z_setterm(void);
+extern void z_resetterm(void);	/* standard mode */
+extern void z_setterm(void);	/* fancy capture mode */
+extern int z_kbhit(void);	/* was a key pressed? (nonblocking) */
+
 extern boolean input(z80info *z80, byte haddr, byte laddr, byte *val);
 extern void output(z80info *z80, byte haddr, byte laddr, byte data);
-extern void haltcpu(z80info *z80);
+
 extern word read_mem(z80info *z80, word addr);
 extern word write_mem(z80info *z80, word addr, byte val);
+
+extern void haltcpu(z80info *z80);
 extern void undefinstr(z80info *z80, byte instr);
 extern boolean loadfile(z80info *z80, const char *fname);
 
