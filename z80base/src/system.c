@@ -1,4 +1,4 @@
-/* iomem.c
+/* system.c
  *
  *   An example file to show how IO and Memory can be implemented 
  *   outside of the z80 core
