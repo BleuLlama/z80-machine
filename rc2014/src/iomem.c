@@ -16,10 +16,8 @@
 MemRegion mems[] = 
 {
     /* 0x1000 = 4kbytes */
-    { 0x0000, (8 * 1024), REGION_RO, NULL, 
-	//"ROMS/aciatest.rom" },
-	"ROMs/basic.32.rom" },
-    { 0x2000, (32 * 1024), REGION_RW, NULL, NULL },
+    { 0x0000, (8 * 1024), REGION_RO, REGION_ACTIVE, NULL, "ROMs/basic.32.rom" },
+    { 0x2000, (32 * 1024), REGION_RW, REGION_ACTIVE, NULL, NULL },
     REGION_END
 };
 

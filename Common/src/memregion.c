@@ -12,6 +12,10 @@
 #include "memregion.h"
 
 
+/* regions_init
+ *
+ * 	load in ROMs, allocate memory, all that stuff
+ */
 void regions_init( MemRegion * m, byte * z80mem )
 {
     int region = 0;
@@ -55,6 +59,11 @@ void regions_init( MemRegion * m, byte * z80mem )
     }
 }
 
+
+/* regions_read
+ *
+ *      perform a memory read on the specified address
+ */
 byte regions_read( MemRegion * m, word addr )
 {
     if( !m ) return 0xff;
@@ -74,6 +83,11 @@ byte regions_read( MemRegion * m, word addr )
     return 0xff;
 }
 
+
+/* regions_write
+ *
+ *      perform a memory write on the specified address
+ */
 byte regions_write( MemRegion * m, word addr, byte val )
 {
     if( !m ) return 0xff;
