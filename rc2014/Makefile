@@ -1,69 +1,16 @@
+# Makefile for the RC2014 emulator
+#  This relies heavily on the Common/ includes
 
 TARG := rc2014
 
-BUILD := ./build
-BIN := ./bin
-SRC := ./src
-ORIGSRC := ../z80orig/src
-COMMONSRC := ../Common/src
-CC := gcc
-CFLAGS := -O2 -pipe -Wall -DPOSIX_TTY -DLITTLE_ENDIAN -DMEM_BREAK \
-	  -I$(ORIGSRC) -I$(COMMONSRC) -I$(SRC) \
-	  -DEXTERNAL_IO -DEXTERNAL_MEM \
-	  -DSYSTEM_POLL \
-	  -Wall -pedantic \
-	  -Wno-pointer-sign -Wno-int-to-pointer-cast 
+include ../Common/defs.mak
 
-UNUSED_CFLAGS := -DAUTORUN -DRAW_TERM
-
-LDFLAGS := 
-
-SRCS := \
-	$(ORIGSRC)/z80.c \
-	$(ORIGSRC)/disassem.c \
-	$(ORIGSRC)/main.c \
-	$(COMMONSRC)/memregion.c \
-	$(COMMONSRC)/mc6850_console.c \
-	$(SRC)/iomem.c 
-
-OBJS := $(addprefix $(BUILD)/, $(notdir $(SRCS:%.c=%.o) ) )
-
-all: dirs $(BIN)/$(TARG)
-
-dirs:
-	@-mkdir $(BUILD) 2>&1
-	@-mkdir $(BIN) 2>&1
-	@-ln -s ../ROMs
-
-$(TARG): $(BIN)/$(TARG)
-
-$(BIN)/$(TARG): dirs $(OBJS)
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJS)
-
-$(BUILD)/z80.o:		$(ORIGSRC)/defs.h $(ORIGSRC)/z80.c
-$(BUILD)/disassem.o:	$(ORIGSRC)/defs.h $(ORIGSRC)/disassem.c
-$(BUILD)/main.o:	$(ORIGSRC)/defs.h $(ORIGSRC)/main.c
-$(BUILD)/iomem.o:	$(ORIGSRC)/defs.h $(SRC)/iomem.c
-$(BUILD)/memregion.o:	$(ORIGSRC)/defs.h $(COMMONSRC)/memregion.c
-$(BUILD)/m6850_console.o:	$(ORIGSRC)/defs.h $(COMMONSRC)/6850_console.c
+# additional defs
+CFLAGS += 
+SRCS += 
 
 
-$(BUILD)/%.o: $(ORIGSRC)/%.c
-	$(CC) $(CFLAGS) -c -o $@ $<
+include ../Common/rules.mak
 
-$(BUILD)/%.o: $(COMMONSRC)/%.c
-	$(CC) $(CFLAGS) -c -o $@ $<
-
-$(BUILD)/%.o: $(SRC)/%.c
-	$(CC) $(CFLAGS) -c -o $@ $<
-
-clean:
-	-rm -rf $(BIN)/ $(BUILD)/
-
-.PHONY: $(TARG)
-
-
-test: $(BIN)/$(TARG)
-	./$(BIN)/$(TARG)
-
-.PHONY: test
+# additional rules
+$(BUILD)/m6850_xxx.o:	$(ORIGSRC)/defs.h $(COMMONSRC)/6850_xxx.c
