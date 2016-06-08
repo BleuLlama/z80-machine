@@ -7,6 +7,9 @@
 #include <stdio.h>
 #include "defs.h"
 
+#undef SHOW_POLL
+#undef SHOW_MEMORY_ACCESS
+#undef SHOW_IO_ACCESS
 
 /* ********************************************************************** */
 /*  -DSYSTEM_POLL */
@@ -22,7 +25,9 @@ void system_init( z80info * z80 )
 void system_poll( z80info * z80 )
 {
     /* status printout */
+#ifdef SHOW_POLL
     printf( "System Poll...\n" );
+#endif
 
     /* this is how we'd trigger an NMI: 
     NMI = 1;
@@ -36,16 +41,20 @@ void system_poll( z80info * z80 )
 /* This gets called when the emulator starts to do any additional init */
 void io_init( z80info * z80 )
 {
+#ifdef SHOW_IO_ACCESS
     /* status printout */
     printf( "IO Init\n" );
+#endif
 }
 
 
 /* Z80 "OUT" instruction calls this if EXTERNAL_IO is defined */
 void io_output( z80info *z80, byte haddr, byte laddr, byte data)
 {
+#ifdef SHOW_IO_ACCESS
     /* status printout */
     printf( "IO OUT %02x: %02x\n", laddr, data );
+#endif
 }
 
 
@@ -55,8 +64,10 @@ void io_input(z80info *z80, byte haddr, byte laddr, byte *val )
     /* an example of filling the return value */
     if( val ) *val = 0xff;
 
+#ifdef SHOW_IO_ACCESS
     /* status printout */
     printf( "IO In %02x\n", laddr );
+#endif
 }
 
 
@@ -73,6 +84,8 @@ void io_input(z80info *z80, byte haddr, byte laddr, byte *val )
 void mem_init( z80info * z80 )
 {
     int i;
+
+    printf( "Memory init:\n" );
 
     /* here's a short little program we'll shove into RAM to show
        that Memory and IO are functioning as expected */
@@ -103,8 +116,6 @@ void mem_init( z80info * z80 )
 	0x76,              //         halt
     };
 
-    printf( "Memory init:\n" );
-
     /* copy the program into memory */
     for( i=0 ; i<sizeof( program ) ; i++ )
     {
@@ -119,8 +130,10 @@ word mem_read( z80info * z80, word addr )
     /* get the value from Z80 memory */
     byte val = z80->mem[ addr ];
 
+#ifdef SHOW_MEMORY_ACCESS
     /* status printout */
     printf( "Memory Read:  addr=0x%04x  val=0x%02x\n", addr, val );
+#endif
 
     /* and return the byte from Z80 memory */
     return ( val );
@@ -130,8 +143,10 @@ word mem_read( z80info * z80, word addr )
 /* Z80 memory write calls this to write a byte */
 word mem_write( z80info * z80, word addr, byte val )
 {
+#ifdef SHOW_MEMORY_ACCESS
     /* status printout */
     printf( "Memory Write:  addr=0x%04x  val=0x%02x\n", addr, val );
+#endif
 
     /* and set the value and return it */
     return( (z80->mem[addr] = val) );

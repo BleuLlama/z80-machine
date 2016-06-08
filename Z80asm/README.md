@@ -20,3 +20,29 @@ in source form from my repository of Z80 dev tools available here:
 
 Also there is a required tool called "genroms" which converts Intel
 hex files (IHX, HEX) to binary ROM files.
+
+# Projects
+
+- Common
+  - Things common to all of the projects, shared makefile, rom definitions
+
+- aciatest
+  - Simple program I wrote to test polled IO for RC2014/68C50 emulation
+
+- basic
+  - In progress project to adapt NASCOM/Grant Searle's BASIC to build with asz80
+
+- basic.32
+  - Nascom BASIC for 32k of RAM
+
+- basic.56
+  - Nascom BASIC for 56 of RAM
+
+- iotest
+  - Another test for ACIA/68C50 emulation, and a test of loader ideas
+
+- lloader
+  - SD Card bootlaoder in progress
+
+- smalltest
+  - Simple test to show how the build mechanism works

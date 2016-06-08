@@ -13,7 +13,7 @@ CFLAGS := -O2 -pipe -Wall -DPOSIX_TTY -DLITTLE_ENDIAN -DMEM_BREAK \
 	  -DSYSTEM_POLL \
 	  -Wno-pointer-sign -Wno-int-to-pointer-cast 
 
-UNUSED_FLAGS := -DAUTORUN -DRAW_TERM
+UNUSED_CFLAGS := -DAUTORUN -DRAW_TERM
 
 LDFLAGS := 
 
@@ -31,6 +31,7 @@ all: dirs $(BIN)/$(TARG)
 dirs:
 	@-mkdir $(BUILD) 2>&1
 	@-mkdir $(BIN) 2>&1
+	@-ln -s ../ROMs
 
 $(TARG): $(BIN)/$(TARG)
 

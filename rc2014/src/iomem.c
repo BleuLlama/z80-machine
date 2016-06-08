@@ -16,7 +16,9 @@
 MemRegion mems[] = 
 {
     /* 0x1000 = 4kbytes */
-    { 0x0000, (8 * 1024), REGION_RO, NULL, "ROMs/basic.32.rom" },
+    { 0x0000, (8 * 1024), REGION_RO, NULL, 
+	//"ROMS/aciatest.rom" },
+	"ROMs/basic.32.rom" },
     { 0x2000, (32 * 1024), REGION_RW, NULL, NULL },
     REGION_END
 };
@@ -36,6 +38,7 @@ MemRegion mems[] =
 static int util_kbhit()
 {
     struct timeval tv;
+
     fd_set fds;
     tv.tv_sec = 0;
     tv.tv_usec = 0;
@@ -43,7 +46,7 @@ static int util_kbhit()
     FD_SET(STDIN_FILENO, &fds); //STDIN_FILENO is 0
     select(STDIN_FILENO+1, &fds, NULL, NULL, &tv);
 
-    return FD_ISSET(STDIN_FILENO, &fds);
+    return( FD_ISSET(STDIN_FILENO, &fds) );
 }
 
 
@@ -54,12 +57,13 @@ static int util_kbhit()
 /* gets called once on startup immediately after z80 struct gets filled */
 void system_init( z80info * z80 )
 {
-    /* status printout */
-    printf( "System initialization:\n" );
+    /* Emulation info and credits */
+    printf( "Emulation of the RC2014 system\n" );
+    printf( "  RC2014 by Spencer Owen\n" );
+    printf( "  SBC by Grant Searle\n" );
+    printf( "  Emu by Scott Lawrence\n" );
+    printf( "\n" );
 }
-
-static char ch = 0;
-static char hit = 0;
 
 /* this gets called before each opcode is run. */
 void system_poll( z80info * z80 )
@@ -69,12 +73,10 @@ void system_poll( z80info * z80 )
     /* NMI -> call 0x0066 */
     /* INTR -> call 0x0038 (IM1) */
 
-    if( util_kbhit() && !hit ) 
+    if( util_kbhit() ) 
     {
-	hit = 1;
-	ch = fgetc( stdin );
-	INTR = 0x1; /* for IM 1 support only */
-	IFF |= INT_FLAG; /* set the flag */
+	INTR = 1; /* for IM 1 support only */
+	EVENT = TRUE;
     }
 }
 
@@ -183,24 +185,19 @@ void io_input(z80info *z80, byte haddr, byte laddr, byte *val )
     /* an example of filling the return value */
     if( val ) *val = 0xff;
 
-
     switch( laddr ) {
     case( kMC6850PortRxData ):
-        printf( "[[IN RX %02x]]", laddr ); fflush( stdout );
 	*val = 0xff;
-	//if( util_kbhit() ) {
-	if( hit ) {
-	    printf( "HIT [[%02x]]", ch ); fflush( stdout );
-	    if( ch == '\n' ) printf( "back-n\n" );
-	    if( ch == '\r' ) printf( "back-r\n" );
-	    *val = (byte) ch;
+	if( util_kbhit() ) {
+	    *val = getchar();
+	    //scanf (" %c", val);
+//	    if( *val == 0x0d ) printf( "0x0d\n" );
 	}
 	break;
 
     case( kMC6850PortStatus ):
-        printf( "[[IN status %02x]]", laddr ); fflush( stdout );
 	v = 0;
-        if( hit ) { //util_kbhit() ) {
+        if( util_kbhit() ) {
                 v |= kPRS_RxDataReady; /* key is available to read */
         }
         v |= kPRS_TXDataEmpty;        /* we're always ready for new stuff */

@@ -16,6 +16,34 @@ STACK		= 0x9000
 	di			; disable interrupts
 	ld	sp, #STACK	; setup the stack
 	im	1		; interrupt mode 1
+
+	ld	a, #0x0d
+	out	(ACIA_DATA), a
+	ld	a, #0x0a
+	out	(ACIA_DATA), a
+	ld	a, #0x0d
+	out	(ACIA_DATA), a
+	ld	a, #0x0a
+	out	(ACIA_DATA), a
+xxx:
+	in	a, (ACIA_CONTROL)
+	and	#0x01
+	jr	z, xxx
+
+	ld	a, #0x7c
+	out	(ACIA_DATA), a
+
+	in	a, (ACIA_DATA)
+	out	(ACIA_DATA), a
+	jr	xxx
+
+
+
+
+
+
+
+
 	jp	main		; do our thing
 
 .org 0x0038			; Interrupt handler

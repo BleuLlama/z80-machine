@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>	/* for calloc */
 #include <string.h>	/* for memcpy */
+#include <curses.h>
 #include "defs.h"
 #include "memregion.h"
 

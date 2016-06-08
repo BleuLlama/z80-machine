@@ -124,13 +124,11 @@ z_initterm(void)
     tcgetattr(0, &oldterm);
     tcgetattr(0, &rawterm);
 
-    //rawterm = oldterm;
-
     rawterm.c_lflag &= ~(ICANON | ECHO);
     rawterm.c_iflag &= ~(IXON | IXANY | IXOFF);
     //rawterm.c_iflag &= ~(IGNCR | ICRNL | INLCR);
     //rawterm.c_oflag &= ~(ONLCR | OCRNL);
-    rawterm.c_iflag |= ICRNL;
+    rawterm.c_iflag &= ~(ICRNL);
 
     /* these are common for all UNIX's nowadays */
     rawterm.c_cc[VMIN] = 1;
@@ -1126,6 +1124,21 @@ main(int argc, const char *argv[])
     const char *s;
 #endif
 
+    printf( "\n" );
+    printf( "Z80 System Emulator\n" );
+    printf( " v3.1.1 February 2016\n" );
+    printf( "   2016 Scott Lawrence\n" );
+    printf( "   2016 Duncan McGreggor\n" );
+    printf( "   1994-1995 CodeGen, Inc\n" );
+    printf( "   1986-1988 Parag Patel\n" );
+    printf( "\n" );
+    printf( "Starting up...\n" );
+    printf( "\n" );
+    printf( " '?' for help\n" );
+    printf( " 'g' to execute Z80\n" );
+    printf( " ctrl-'-' to break\n" );
+    printf( "\n" );
+
     z80 = new_z80info();
 
     if (z80 == NULL)
@@ -1205,7 +1218,6 @@ main(int argc, const char *argv[])
     else
     {
 #endif
-
         if (argc <= 1)
             command(z80);
 
