@@ -11,11 +11,16 @@
 
 /* ********************************************************************** */
 /*
- *      Ports and bit masks for MC6580 emulation
+ *      Ports for MC6580 emulation
  */
 
+    /* data */
 #define kMC6850PortRxData       (0x81)
 #define kMC6850PortTxData       (0x81)
+
+    /* status and control */
+#define kMC6850PortStatus       (0x80)
+#define kMC6850PortControl      (0x80)
 
 
 /* ********************************************************************** */

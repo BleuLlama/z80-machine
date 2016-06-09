@@ -71,20 +71,28 @@ void io_init( z80info * z80 )
     */
 }
 
+/* digital IO simulation */
+static byte digital_io0	= 0x00;
+static byte digital_io1	= 0x11;
+static byte digital_io2	= 0x22;
+static byte digital_io3	= 0x33;
+
 
 /* Z80 "OUT" instruction calls this if EXTERNAL_IO is defined */
 void io_output( z80info *z80, byte haddr, byte laddr, byte data )
 {
     switch( laddr ) {
+
+    /* simple simulation of digital I/o, output the data we got in */
+    case( 0x00 ): digital_io0 = data; break;
+    case( 0x01 ): digital_io1 = data; break;
+    case( 0x02 ): digital_io2 = data; break;
+    case( 0x03 ): digital_io3 = data; break;
+
+    /* console IO */
     case( kMC6850PortTxData ):	mc6850_out_console_data( data ); 	break;
     case( kMC6850PortControl ):	mc6850_out_console_control( data );	break;
 
-/*
-    case( kSDPortTxData ):
-    case( kSDPortControl ):
-
-    case( kROMSwapper ):
-*/
     default:
 	break;
     }
@@ -100,14 +108,17 @@ void io_input(z80info *z80, byte haddr, byte laddr, byte *val )
     *val = 0xff;
 
     switch( laddr ) {
+
+    /* simple simulation of digital I/o, output the data we got in */
+    case( 0x00 ): *val = digital_io0; break;
+    case( 0x01 ): *val = digital_io1; break;
+    case( 0x02 ): *val = digital_io2; break;
+    case( 0x03 ): *val = digital_io3; break;
+
+    /* console IO */
     case( kMC6850PortRxData ):	*val = mc6850_in_console_data(); 	break;
     case( kMC6850PortStatus ):	*val = mc6850_in_console_status();	break;
-/*
-    case( kSDPortRxData ):
-    case( kSDPortStatus ):
 
-    case( kROMSwapper ):
-*/
     default:
 	break;
     }

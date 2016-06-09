@@ -2,6 +2,7 @@ src/*.o
 *.o
 bin/
 ROMs
+mem
 drives/A-Hdrive
 reference/
 notes.txt
