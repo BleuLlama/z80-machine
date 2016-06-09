@@ -370,12 +370,29 @@ loop:    /* "infinite" loop */
         /*if(gets(str)){};*/
         if(fgets(str, sizeof(str), stdin)){};
         sscanf(str, "%x", &e);
+
+	if( t == e && t != 0) {
+	    printf( "Start and End cannot be the same!\n" );
+	    break;
+	}
+
+	if( t == e && t == 0 ) {
+	    printf( "Using 0000-FFFF\n" );
+	    e = 0xFFFF;
+	}
+
+	if( t > e ) {
+	    printf( "Start cannot be after End!\n" );
+	    break;
+	}
+
         fp = fopen("mem", "w");
 
         if (fp == NULL)
             printf("Cannot open file 'mem' for writing!\n");
         else
         {
+	    printf( "Saving to file \"mem\"\n" );
             j = 0;
 
             for (i = t; i < e; i++)
