@@ -18,6 +18,7 @@
     $80 - Serial I/O Board (console) - MC68B50 ACIA Status
     $80 - Serial I/O Board (console) - MC68B50 ACIA Data
 
+    $EE - Emulation detection (reports 0x53 'S')
 
 ## Output Ports
 

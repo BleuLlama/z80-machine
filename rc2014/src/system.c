@@ -119,6 +119,9 @@ void io_input(z80info *z80, byte haddr, byte laddr, byte *val )
     case( kMC6850PortRxData ):	*val = mc6850_in_console_data(); 	break;
     case( kMC6850PortStatus ):	*val = mc6850_in_console_status();	break;
 
+    /* emulator detection */
+    case( 0xEE ): *val = 'S';	break;
+
     default:
 	break;
     }
