@@ -6,6 +6,7 @@
     $2000 - $7FFF	(unused)
     $8000 - $FFFF	32k RAM
 
+
 ## Input Ports
 
     $00 - (prototype SD bootloader card) (unavailable)
@@ -18,7 +19,8 @@
     $80 - Serial I/O Board (console) - MC68B50 ACIA Status
     $80 - Serial I/O Board (console) - MC68B50 ACIA Data
 
-    $EE - Emulation detection (reports 0x53 'S')
+    $EE - Emulation detection (reports 0x41 'A') (See below)
+
 
 ## Output Ports
 
@@ -31,6 +33,7 @@
 
     $80 - Serial I/O Board (console) - MC68B50 ACIA Control
     $80 - Serial I/O Board (console) - MC68B50 ACIA Data
+
 
 ## Emulation info...
 
@@ -47,3 +50,17 @@ Four Digital IO ports are configured at $00, $01, $02, and $03.
 These are wired to themselves, so a write to $00 will appear on a
 read from $00 as well, and similarly for $01, $02, and $03.  Anything
 written to port $02 will be read back from a read on port $02.
+
+
+## Emulation detection
+
+To aid in runtime checks, I've added a virtual port at $EE.  Reads
+from this port on actual hardware will produce 0x00 or 0xFF (untested)
+but on emulation, it will produce a known, defined result.  What
+follows is the "registry" of all of the valid responses, and what
+emulation they refer to.
+
+ - $00 - reserved / undefined
+ - $FF - reserved / undefined
+ - $41 - 'A' - RC2014 base hardware (this project)
+ - $42 - 'B' - RC2014LL - Scott Lawrence's 64k ROM switchable system

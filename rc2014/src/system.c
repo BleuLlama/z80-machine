@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <string.h>		/* for memset(), memcpy() etc */
 #include "defs.h"		/* z80 emu system header */
+#include "utils.h"
 #include "memregion.h"		/* memory region handling */
 #include "mc6850_console.h"	/* mc6850 emulation as console */
 
@@ -77,17 +78,19 @@ static byte digital_io1	= 0x11;
 static byte digital_io2	= 0x22;
 static byte digital_io3	= 0x33;
 
-
 /* Z80 "OUT" instruction calls this if EXTERNAL_IO is defined */
 void io_output( z80info *z80, byte haddr, byte laddr, byte data )
 {
+    int display = 0;
+
     switch( laddr ) {
 
     /* simple simulation of digital I/o, output the data we got in */
-    case( 0x00 ): digital_io0 = data; break;
-    case( 0x01 ): digital_io1 = data; break;
-    case( 0x02 ): digital_io2 = data; break;
-    case( 0x03 ): digital_io3 = data; break;
+    case( 0x00 ): digital_io0 = data; display = 1; break;
+
+    case( 0x01 ): digital_io1 = data; display = 2; break;
+    case( 0x02 ): digital_io2 = data; display = 2; break;
+    case( 0x03 ): digital_io3 = data; display = 2; break;
 
     /* console IO */
     case( kMC6850PortTxData ):	mc6850_out_console_data( data ); 	break;
@@ -95,6 +98,22 @@ void io_output( z80info *z80, byte haddr, byte laddr, byte data )
 
     default:
 	break;
+    }
+
+    if( display == 1 ) {
+	printf( ">> $00: ($%02x b"BYTE_TO_BINARY_PATTERN")"
+		  "\n", 
+		digital_io0, BYTE_TO_BINARY( digital_io0 ) );
+    }
+
+    if( display == 2 ) {
+	printf( ">> $01: ($%02x b"BYTE_TO_BINARY_PATTERN")"
+		  " $02: ($%02x b"BYTE_TO_BINARY_PATTERN")"
+		  " $03: ($%02x b"BYTE_TO_BINARY_PATTERN")"
+		  "\n", 
+		digital_io1, BYTE_TO_BINARY( digital_io1 ),
+		digital_io2, BYTE_TO_BINARY( digital_io2 ),
+		digital_io3, BYTE_TO_BINARY( digital_io3 ) );
     }
 }
 
@@ -120,7 +139,7 @@ void io_input(z80info *z80, byte haddr, byte laddr, byte *val )
     case( kMC6850PortStatus ):	*val = mc6850_in_console_status();	break;
 
     /* emulator detection */
-    case( 0xEE ): *val = 'S';	break;
+    case( 0xEE ): *val = 'A';	break;
 
     default:
 	break;
