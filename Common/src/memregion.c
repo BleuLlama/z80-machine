@@ -72,6 +72,7 @@ byte regions_read( MemRegion * m, word addr )
     {
 	if(    (addr >= m->addressStart)
 	    && (addr < (m->addressStart + m->length ))
+	    && (REGION_ACTIVE == m->active ) 
 	)
 	{
 	    return m->mem[ addr - m->addressStart ];
@@ -97,6 +98,7 @@ byte regions_write( MemRegion * m, word addr, byte val )
 	if(    (addr >= m->addressStart)
 	    && (addr < (m->addressStart + m->length ))
 	    && (m->writable == REGION_RW) 
+	    && (REGION_ACTIVE == m->active) 
 	)
 	{
 	    m->mem[ addr - m->addressStart ] = val;
