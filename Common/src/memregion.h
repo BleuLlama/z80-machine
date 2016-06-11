@@ -56,4 +56,11 @@ byte regions_read( MemRegion * m, word addr );
  */
 byte regions_write( MemRegion * m, word addr, byte val );
 
+
+/* regions_display
+ *
+ * 	display the rom regions 
+ */
+void regions_display( MemRegion * m );
+
 #endif

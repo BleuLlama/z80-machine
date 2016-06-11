@@ -15,6 +15,10 @@
 
 .include "../Common/hardware.asm"	; hardware definitions
 
+CopyRemap0      = 0xC000        ; where bank 0 is remapped to for ROM write
+CopyLoc         = 0x8000        ; where we copy the stub to to survive remap
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; initial entry point
 
@@ -22,7 +26,6 @@
 .org 0x0000			; start at 0x0000
 	di			; disable interrupts
 	jp	coldboot	; and do the stuff
-
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; RST 08 - println( "\r\n" );
@@ -71,32 +74,44 @@ sdz:
 .org 0x0030
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; RST 38 - unused
+; RST 38 - Interrupt handler for console input
 .org 0x0038
+    	reti
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; memory maps of possible hardware...
+;  addr   	SBC	2014	LL
+; E000 - FFFF 	RAM	RAM	RAM
+; C000 - DFFF	RAM	RAM	RAM
+; A000 - BFFF	RAM	RAM	RAM
+; 8000 - 9FFF	RAM	RAM	RAM
+; 6000 - 7FFF	RAM		RAM
+; 4000 - 5FFF	RAM		RAM
+; 2000 - 3FFF	ROM	ROM	RAOM
+; 0000 - 1FFF	ROM	ROM	RAOM
+
+STACK 	= 0xF800
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; coldboot - the main code block
 .org 0x100
 coldboot:
 	;;;;;;;;;;;;;;;;;;;;	
-	; 1. setup banks for cold boot
-				;        vv------------ $c000
-				;        || vv--------- $8000
-				;        || || vv------ $4000
-				;        || || || vv--- $0000
-	ld	a, #0x24	; banks: 00 02 01 00
-				;        || || || ^^--- ignored
-				;        || ^^-^^------ RAM banks
-				;        ^^------------ ROM in bank 00
-	out	(BankConfig), a	; restore banks to their setup configuration
+	; 1. setup 
+	ld	a, #0x00	; bit 0, 0x01 is ROM Disable
+				; = 0x00 -> ROM is enabled
+				; = 0x01 -> ROM is disabled
+	out	(RomDisable), a	; restore ROM to be enabled
 
 	;;;;;;;;;;;;;;;;;;;;	
 	; 2. setup stack for lloader
-	ld	sp, #0x3FFF	; set up a stack pointer (top of bank 1)
+	ld	sp, #STACK	; setup a stack pointer valid for all
 
 	;;;;;;;;;;;;;;;;;;;;	
 	; 3. display splash text
-	rst	#0x08
+	rst	#0x08		; newline
 	ld	hl, #str_splash
 	rst	#0x10		; print to terminal
 
@@ -107,24 +122,11 @@ main:
 	ld	hl, #str_menu
 	rst	#0x10		; print to terminal
 
-	ld	bc, #0x0000
-	ld	e, #0x01	; enable autostart
-
-	; display the prompt
 prompt:
 	ld	hl, #str_prompt
 	rst	#0x10		; print with newline
-ploop:
-	; check for autoboot/timeout
-	ld	a, e		; if E is clear, we skip auto
-	cp	#0x00
-	jr	z, SkipAuto
-	inc	bc
-	ld	a, b		; check for timeout...
-	cp	#0xF0		; 0xF000 ?
-	jp	z, Autoboot
 
-SkipAuto:
+ploop:
 	in	a, (TermStatus)	; ready to read a byte?
 	and	#DataReady	; see if a byte is available
 
@@ -139,34 +141,38 @@ SkipAuto:
 	; handle the passed in byte...
 
 	in	a, (TermData)	; read byte
-	cp	#0x3f		; '?' - help
-	jr 	z, ShowHelp
+	cp	#'?		; '?' - help
+	jp 	z, ShowHelp
 
-	cp	#0x42		; 'B' - Boot.
-	jr 	z, DoBoot
+	cp	#'B		; 'B' - Boot.
+	jp 	z, DoBoot
 
-	cp	#0x53		; 'S' - sysinfo
-	jr 	z, ShowSysInfo
+	cp	#'S		; 'S' - sysinfo
+	jp 	z, ShowSysInfo
 
-	cp	#0x48		; 'H' - halt and exit
-	jr	z, exit
+	cp	#'E		; 'E' - exit the emulator
+	jp	z, exit
 
 
-	cp	#0x30		; '0' - basic32.rom
-	jr	z, DoBootBasic32
+	cp	#'0		; '0' - basic32.rom
+	jp	z, DoBootBasic32
 
-	cp	#0x31		; '1' - basic56.rom
-	jr	z, DoBootBasic56
+	cp	#'1		; '1' - basic56.rom
+	jp	z, DoBootBasic56
 
-	cp	#0x32		; '2' - iotest.rom
-	jr	z, DoBootIotest
+	cp	#'2		; '2' - iotest.rom
+	jp	z, DoBootIotest
 
 	jr	prompt		; ask again...
 	
+
 	;;;;;;;;;;;;;;;
 	; exit from the rom (halt)
 exit:
+	ld	a, #0xF0	; F0 = flag to exit
+	out	(EmulatorControl), a
 	halt			; rc2014sim will exit on a halt
+
 
 	;;;;;;;;;;;;;;;
 	; show help subroutine
@@ -180,15 +186,15 @@ ShowHelp:
 ShowSysInfo:
 	ld	hl, #str_splash
 	rst	#0x10
-	jr	prompt
+
+	call	ShowMemoryMap	; show the memory map
+	ret
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 	;;;;;;;;;;;;;;;
-	; autoboot. (load the default ROM after timeout)
-Autoboot:
-	ld	hl, #str_idletxt
-	rst	#0x10
-	jr 	DoBoot
-
+	; boot roms
 DoBootBasic32:
 	ld	hl, #cmd_bootBasic32
 	jr	DoBootB	
@@ -263,19 +269,19 @@ LoadDone:
 
 str_splash:
 	.ascii	"Boot Lloader/Utilities for RC2014-LL\r\n"
-	.ascii	"  v002 2016-May-10  Scott Lawrence\r\n"
+	.ascii	"  v003 2016-June-10  Scott Lawrence\r\n"
 	.asciz  "\r\n"
 
 str_prompt:
 	.asciz  "LL> "
 
 str_menu:
-	.asciz  "[?] for help, or wait for autoboot...\r\n"
+	.asciz  "[?] for help\r\n"
 
 str_help:
 	.ascii  "  ? for help\r\n"
-	.ascii  "  B for boot.rom (wait for autoboot)\r\n"
-	.ascii	"  H to halt\r\n"
+	.ascii  "  B for boot.rom\r\n"
+	.ascii	"  E to exit emulator \r\n"
 	.ascii	"  S for system info\r\n"
 	.ascii	"\r\n"
 	.ascii	"  0 for basic32.rom\r\n"
@@ -306,9 +312,6 @@ cmd_bootread:
 cmd_bootsave:
 	.asciz	"~S\n"
 
-str_idletxt:
-	.asciz  "\r\nNo input detected, autobooting..\r\n"
-
 str_loading:
 	.ascii 	"Loading \"boot.rom\" from SD...\r\n"
 	.asciz	"Storing at $0000 + $4000\r\n"
@@ -319,7 +322,15 @@ str_loaded:
 str_nofile:
 	.asciz	"Couldn't load specified rom.\n\r"
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+.include "memprobe.asm"
+.include "print.asm"
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; utility includes
+
+
 
 .include "../Common/banks.asm"

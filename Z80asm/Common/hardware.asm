@@ -24,13 +24,12 @@ SDData		= 0xD0	; Data on MC6850 for SD comms
 	;  ~R		Open that file for read
 
 ;;;;;;;;;;;;;;;;;;;;
-BankConfig	= 0xF0	; bank configuration port
-	; bits are in pairs,  0b-33221100
-	; when bits for bank 3 are set to 00, the ROM is in place in bank 00
-	; on poweron, the value is 0x00
+RomDisable	= 0x00	; IO port 00
+	; bit 0 (0x01) is the ROM disable bit,
+	;  = 0x00 -> ROM is active
+	;  = 0x01 -> ROM is disabled
 
 ;;;;;;;;;;;;;;;;;;;;
-CopyRemap0	= 0xC000	; where bank 0 is remapped to for ROM write
-CopyLoc		= 0x8000	; where we copy the stub to to survive remap
-
-
+EmulatorControl	= 0xEE
+	; Read for version of emulator
+	; write F0 to exit emulator

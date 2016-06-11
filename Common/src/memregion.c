@@ -11,6 +11,35 @@
 #include "defs.h"
 #include "memregion.h"
 
+/* regions_display
+ *
+ * 	display the rom regions 
+ */
+void regions_display( MemRegion * m )
+{
+    int region = 0;
+
+    while( m->addressStart < REGION_MAX )
+    {
+	printf( "Mem region %d: 0x%04lx - 0x%04lx (%s) (%s) ",
+		region,
+		m->addressStart, m->addressStart + m->length - 1,
+		m->writable? "RAM" : "ROM",
+		m->active? "ACTIVE" : "disabled"
+		);
+
+	if( m->loadFileName != NULL )
+	{
+		printf( "%s", m->loadFileName );
+	}
+	printf( "\n" );
+
+	/* next... */
+	m++;
+	region++;
+    }
+}
+
 
 /* regions_init
  *

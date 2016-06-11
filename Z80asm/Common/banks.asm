@@ -22,8 +22,8 @@ LDCopyLoop:
 
         ; this stub is here, but it gets copied to CopyLoc
 swapOutRom:
-        ld      a, #0xE4        ; banks: 11 10 01 00 
-        out     (BankConfig), a ; runtime bank sel
+        ld      a, #0x01        ; disable rom
+        out     (RomDisable), a ; runtime bank sel
 
         rst     #0x00           ; cold boot
 endSwapOutRom:
@@ -46,8 +46,8 @@ TRCopyLoop:
 
         ; this stub is here, but it gets copied to CopyLoc
 swapInRom:
-        ld      a, #0x24        ; banks: 00 10 01 00 
-        out     (BankConfig), a ; runtime bank sel
+	xor	a		; clear the disable ROM bit
+        out     (RomDisable), a ; runtime bank sel
 
         rst     #0x00           ; cold boot
 endSwapInRom:
