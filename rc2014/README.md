@@ -17,7 +17,7 @@
     $03 - alternate for Digital Input Board
 
     $80 - Serial I/O Board (console) - MC68B50 ACIA Status
-    $80 - Serial I/O Board (console) - MC68B50 ACIA Data
+    $81 - Serial I/O Board (console) - MC68B50 ACIA Data
 
     $EE - Emulation detection (reports 0x41 'A') (See below)
 
@@ -32,7 +32,7 @@
     $03 - alternate for Digital Output Board
 
     $80 - Serial I/O Board (console) - MC68B50 ACIA Control
-    $80 - Serial I/O Board (console) - MC68B50 ACIA Data
+    $81 - Serial I/O Board (console) - MC68B50 ACIA Data
 
 
 ## Emulation info...
