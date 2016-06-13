@@ -1,15 +1,17 @@
 
+CopyLoc = 0xfff0	; make sure there's enoguh space for the routine
 
         ;;;;;;;;;;;;;;;;;;;;
-        ;  Bankswitch to the new bank
+	;  SwitchInRamRom
         ;       the problem is that we need to bank switch,
         ;       but once we do, this rom goes away.
         ;       so we need to pre-can some content
 
-BankSwitchToC000:
-        ld      hl, #CopyLoc    ; this is where we put the stub
+SwitchInRamRom:
+        ld      hl, #0xff00    ; this is where we put the stub
         ld      de, #swapOutRom ; copy from
         ld      b, #endSwapOutRom-swapOutRom    ; copy n bytes
+
 LDCopyLoop:
         ld      a, (de)
         ld      (hl), a
@@ -22,14 +24,13 @@ LDCopyLoop:
 
         ; this stub is here, but it gets copied to CopyLoc
 swapOutRom:
-        ld      a, #0x01        ; disable rom
+        ld      a, #01		; disable rom
         out     (RomDisable), a ; runtime bank sel
-
-        rst     #0x00           ; cold boot
+	jp	0x00000		; cold boot
 endSwapOutRom:
 
 
-BankSwitchToRom:
+SwitchToRom:
         ld      hl, #CopyLoc    ; this is where we put the stub
         ld      de, #swapInRom ; copy from
         ld      b, #endSwapInRom-swapInRom    ; copy n bytes

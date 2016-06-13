@@ -15,9 +15,6 @@
 
 .include "../Common/hardware.asm"	; hardware definitions
 
-CopyRemap0      = 0xC000        ; where bank 0 is remapped to for ROM write
-CopyLoc         = 0x8000        ; where we copy the stub to to survive remap
-
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; initial entry point
@@ -72,11 +69,14 @@ sdz:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; RST 30 - unused
 .org 0x0030
+	ret
+.byte	0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; RST 38 - Interrupt handler for console input
 .org 0x0038
     	reti
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -93,6 +93,8 @@ sdz:
 
 STACK 	= 0xF800
 
+USERRAM = 0xF802
+LASTADDR = USERRAM + 1
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; coldboot - the main code block
@@ -104,6 +106,9 @@ coldboot:
 				; = 0x00 -> ROM is enabled
 				; = 0x01 -> ROM is disabled
 	out	(RomDisable), a	; restore ROM to be enabled
+
+	ld	(LASTADDR), a
+	ld	(LASTADDR+1), a
 
 	;;;;;;;;;;;;;;;;;;;;	
 	; 2. setup stack for lloader
@@ -150,12 +155,30 @@ ploop:
 	cp	#'S		; 'S' - sysinfo
 	jp 	z, ShowSysInfo
 
-	cp	#'E		; 'E' - exit the emulator
-	jp	z, exit
+	cp	#'Q		; 'Q' - quit the emulator
+	jp	z, Quit
+
+	cp	#'E		; examine memory (hex dump)
+	jp	z, ExamineMemory
+
+	cp	#'P
+	jp	z, PokeMemory
+
+	cp	#'7		; temp for now
+	jp	z, CopyROMToRAM
+
+	cp	#'8
+	jp	z, DisableROM
+
+	cp	#'9
+	jp	z, EnableROM
+
+	cp	#'c		; 'c' - cat file
+	jp	z, catFile
 
 
 	cp	#'0		; '0' - basic32.rom
-	jp	z, DoBootBasic32
+	jp	z, DoBootBasic56
 
 	cp	#'1		; '1' - basic56.rom
 	jp	z, DoBootBasic56
@@ -167,12 +190,11 @@ ploop:
 	
 
 	;;;;;;;;;;;;;;;
-	; exit from the rom (halt)
-exit:
+	; quit from the rom (halt)
+Quit:
 	ld	a, #0xF0	; F0 = flag to exit
 	out	(EmulatorControl), a
 	halt			; rc2014sim will exit on a halt
-
 
 	;;;;;;;;;;;;;;;
 	; show help subroutine
@@ -189,6 +211,264 @@ ShowSysInfo:
 
 	call	ShowMemoryMap	; show the memory map
 	ret
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; GetNibbleFromUser
+; returns a byte read from the user to b
+; if user hits 'enter' (default value) then a is 0xFF
+GetNibbleFromUser:
+	xor	a		; reset our return flag
+	ld	b, #0x00	; nibble entered by user
+GNFU_0:
+	in	a, (TermStatus)	; ready to read a byte?
+	and	#DataReady	; see if a byte is available
+	jr	z, GNFU_0	; nope. try again
+
+	in	a, (TermData)	; get the character from the console
+
+
+	cp	#0x0a
+	jr	z, GNFU_Break	; return hit
+	cp	#0x0d
+	jr	z, GNFU_Break	; return hit
+	
+	cp	#'0
+	jr	c, GNFU_0	; < 0, try again
+
+	cp	#'9 + 1
+	jr	c, GNFU_g0	; got 0..9
+
+	cp	#'A
+	jr	c, GNFU_0	; between '9' and 'A', try again
+	
+	cp	#'F + 1
+	jr	c, GNFU_gAuc	; got A-F
+
+	cp	#'a 
+	jr	c, GNFU_0	; between 'F' and 'a', try again
+
+	cp	#'f + 1
+	jr	c, GNFU_galc	; got a-f
+
+	jr	GNFU_0		; not valid, retry
+
+GNFU_g0:			; '0'..'9'
+	sub	#'0
+	ld	b, a
+	xor	a
+	ret
+
+GNFU_galc:			; 'a'..'f'
+	and	#0x4F		; make uppercase
+GNFU_gAuc:			; 'A'..'F'
+	add	#10-'A
+	ld	b, a
+	xor	a
+	ret
+
+GNFU_Break:
+	ld	a, #0xff
+	ret
+
+
+; GetByteFromUser
+;	returns a value in b
+;	returns code in a,  0 if ok, FF if no value
+GetByteFromUser:
+	; read top nibble
+	call	GetNibbleFromUser
+	cp	#0xFF
+	ret	z		; user escaped
+
+	
+	ld	a, b
+	call	printNibble
+	sla	a
+	sla	a
+	sla	a
+	sla	a
+	ld	d, a		; store in top half of d
+
+	; read bottom nibble
+	call	GetNibbleFromUser
+	cp	#0xFF
+	ret	z		; user escaped
+
+	ld	a, b
+
+	; combine the two
+	ld	a, b
+	call	printNibble
+	and	#0x0F		; just in case..
+	add	d
+
+	ld	b, a		; store the full result in b
+
+	; return
+	xor	a		; just in case, clear a
+	ret
+
+
+; GetWordFromuser
+; returns a word read from the user to de
+; if user hits 'enter' (default value) then a is 0xFF
+GetWordFromUser:
+	; read top byte
+	call	GetByteFromUser
+	cp	#0xFF
+	ret	z		; user hit return, just return
+	ld	d, b
+
+	; read bottom byte
+	push	de
+	call	GetByteFromUser
+	cp	#0xFF
+	ret	z
+	pop	de
+	ld	e, b
+
+	; if we got here, DE = two nibbles
+	xor	a
+	ret
+
+
+; ExamineMemory
+;  prompt the user for an address
+ExamineMemory:
+	ld	hl, #str_memask
+	rst	#0x10
+
+	; restore last address
+	ld	a, (LASTADDR)
+	ld	h, a
+	ld	a, (LASTADDR+1)
+	ld	l, a
+
+	call	GetWordFromUser
+	cp	#0xFF		; if returned FF, use HL, otherwise new DE
+	jr	z, exmNoDE
+	push	de
+	pop	hl
+
+exmNoDE:
+	ld	b, #16
+exm0:
+	push	bc
+
+	push	hl
+	rst	#0x08
+	pop	hl
+
+	call	Exa20
+
+	pop	bc
+	djnz	exm0
+	
+	jp	prompt
+
+
+str_memask:
+	.asciz 	"Enter address: "
+
+str_spaces:
+	.asciz	" "
+
+Exa20:
+	call	printHL
+	push	hl
+	ld	hl, #str_spaces
+	rst	#0x10
+	rst	#0x10
+	pop	hl
+
+	push	hl
+	ld	b, #0x10
+
+Exa20_0:
+	ld	a, (hl)
+	call	printByte
+	push	hl
+	 ld	hl, #str_spaces
+	 rst	#0x10
+	
+	; add an extra space on the middle byte
+	 ld	a, b
+	 cp	#0x09
+	 jr 	nz, Exa20_1
+
+	 ld	hl, #str_spaces
+	 rst	#0x10
+	
+Exa20_1:
+	pop	hl
+	inc	hl
+	djnz	Exa20_0
+
+	pop	hl
+
+	ld	de, #0x10
+	add	hl, de
+
+	; store the last addr back
+	ld	a, h
+	ld	(LASTADDR), a
+	ld	a, l
+	ld	(LASTADDR+1), a
+	
+	ret
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; PokeMemory
+
+PokeMemory:
+	jp	prompt
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; CopyROMToRAM
+;	copies $0000 thru $2000 to itself
+;	seems like it would do nothing but it's reading from 
+;	the ROM and writing to the RAM
+;	Not sure if this is useful, but it's a good test.
+CopyROMToRAM:
+	xor	a
+	ld	h, a
+	ld	l, a	; HL = $0000
+CR2Ra:
+	ld	a, (hl)
+	ld	(hl), a	; RAM[ hl ] = ROM[ hl ]
+
+	inc	hl	; hl++
+	ld	a, h	; a = h
+	cp	#0x20	; is HL == 0x20 0x00?
+	jr	nz, CR2Ra
+
+	; now patch the RAM image of the ROM so if we reset, it will
+	; continue to be in RAM mode...
+	ld	hl, #coldboot	; 0x3E  (ld a,      )
+	inc	hl		; 0x00	(    , #0x00)
+	ld	a, #0x01	; disable RAM value
+	ld	(hl), a		; change the opcode to  "ld a, #0x01"
+	
+	; we're done. return
+	jp	prompt
+
+; DisableROM
+;	set the ROM disable flag
+DisableROM:
+	ld	a, #01
+	out	(RomDisable), a
+	jp	prompt
+
+
+; EnableROM
+;	clear the ROM disable flag
+EnableROM:
+	xor	a
+	out	(RomDisable), a
+	jp	prompt
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -218,8 +498,8 @@ DoBootB:
 
 
 	;;;;;;;;;;;;;;;;;;;;	
-	; 5. read the file to C000
-	ld 	hl, #CopyRemap0	; 0x0000 is remapped to 0xC000 as per bank
+	; 5. read the file to 0000
+	ld 	hl, #0x0000	; Load it to 0x0000
 
 	in	a, (SDStatus)
 	and	#DataReady
@@ -251,13 +531,33 @@ LoadDone:
 	ld	hl, #str_loaded
 	rst	#0x10
 
-
 	;;;;;;;;;;;;;;;;;;;;
-	; 7. Bankswitch to the new bank
-	;	the problem is that we need to bank switch,
-	; 	but once we do, this rom goes away.
-	;	so we need to pre-can some content
-	jp	BankSwitchToC000	; and swap the bank into place
+	; 7. Swap the ROM out
+	jp	SwitchInRamRom
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+str_hello:
+	.asciz 	"~Ftest.txt\n"
+
+catFile:
+	ld	hl, #str_hello	; select file
+	rst	#0x20		; send to SD command
+	ld	hl, #cmd_bootread ; open for read
+	rst	#0x20		; send to SD command
+
+bar:
+	; check for more bytes
+	in	a, (SDStatus)
+	and	#DataReady	; more bytes to read?
+	jp	z, prompt	; nope. exit out
+	
+	; load a byte from the file, print it out
+	in	a, (SDData)	; get the file data byte
+	out	(TermData), a	; send it out.
+	;ld	(hl), a		; store it out
+	inc	hl		; next position
+	jr	bar
 	
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -269,24 +569,31 @@ LoadDone:
 
 str_splash:
 	.ascii	"Boot Lloader/Utilities for RC2014-LL\r\n"
-	.ascii	"  v003 2016-June-10  Scott Lawrence\r\n"
+	.ascii	"  v004 2016-June-10  Scott Lawrence\r\n"
 	.asciz  "\r\n"
 
 str_prompt:
-	.asciz  "LL> "
+	.asciz  "\r\nLL> "
 
 str_menu:
 	.asciz  "[?] for help\r\n"
 
 str_help:
 	.ascii  "  ? for help\r\n"
-	.ascii  "  B for boot.rom\r\n"
-	.ascii	"  E to exit emulator \r\n"
+	.ascii	"  Q to quit emulator\r\n"
 	.ascii	"  S for system info\r\n"
+	.ascii	"\r\n"
+	.ascii  "  E to examine memory\r\n"
+	.ascii  "  P to poke memory\r\n"
+	.ascii  "  I to read in from a port\r\n"
+	.ascii  "  O to write out to a port\r\n"
 	.ascii	"\r\n"
 	.ascii	"  0 for basic32.rom\r\n"
 	.ascii	"  1 for basic56.rom\r\n"
-	.ascii	"  2 for iotest.rom\r\n"
+	.ascii	"\r\n"
+	.ascii	"  7 Copy ROM to RAM\r\n"
+	.ascii	"  8 Disable ROM (64k RAM)\r\n"
+	.ascii	"  9 Enable ROM (56k RAM)\r\n"
 
 	;ascii  "  C for catalog\r\n"
 	;ascii  "  H for hexdump\r\n"
@@ -294,14 +601,15 @@ str_help:
 	.byte 	0x00
 
 
+
 cmd_bootfile:
 	.asciz	"~FROMs/boot.rom\n"
 
 cmd_bootBasic32:
-	.asciz	"~FROMs/basic32.rom\n"
+	.asciz	"~FROMs/basic.32.rom\n"
 
 cmd_bootBasic56:
-	.asciz	"~FROMs/basic56.rom\n"
+	.asciz	"~FROMs/basic.56.rom\n"
 
 cmd_bootIotest:
 	.asciz	"~FROMs/iotest.rom\n"
@@ -330,7 +638,5 @@ str_nofile:
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; utility includes
-
-
 
 .include "../Common/banks.asm"

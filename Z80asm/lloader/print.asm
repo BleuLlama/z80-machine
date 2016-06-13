@@ -19,6 +19,7 @@
 ; printNibble
 ; 	send the nibble (a & 0x0F) out as ascii to the console 
 printNibble:
+	push	af
 	and	#0x0f		; mask it to be 0x0F
 	add	#'0		; add ascii for 0
 	cp	#'9+1
@@ -26,6 +27,7 @@ printNibble:
 	add	#'A - '0 - 10
 pn2:
 	out	(TermData), a	; send it out
+	pop	af
 	ret
 
 ; printByte:
@@ -65,4 +67,19 @@ printHL:
 	out	(TermData), a	; send it out.
 
 	pop	hl
+	ret
+
+
+; printDE
+; 	send the word de out as ascii
+printDE:
+	push	af
+	push	hl
+
+	push	de
+	pop	hl
+	call	printHL
+
+	pop	hl
+	pop	af
 	ret

@@ -42,7 +42,10 @@ implemented, this port will be at port address $03.
     $03 - Digital Input (buttons) 
 
     $80 - Serial I/O Board (console) - MC68B50 ACIA Status
-    $80 - Serial I/O Board (console) - MC68B50 ACIA Data
+    $81 - Serial I/O Board (console) - MC68B50 ACIA Data
+
+    $D0 - Chained Serial Mass Storage (SD) - MC68B50 ACIA Status
+    $D1 - Chained Serial Mass Storage (SD) - MC68B50 ACIA Data
 
     $EE - Emulation detection (reports 0x42 'B') (see ../rc2014/README.md)
 
@@ -52,4 +55,7 @@ implemented, this port will be at port address $03.
     $03 - Digital IO output.  bit 0 disables ROM
 
     $80 - Serial I/O Board (console) - MC68B50 ACIA Control
-    $80 - Serial I/O Board (console) - MC68B50 ACIA Data
+    $81 - Serial I/O Board (console) - MC68B50 ACIA Data
+
+    $D0 - Chained Serial Mass Storage (SD) - MC68B50 ACIA Control
+    $D1 - Chained Serial Mass Storage (SD) - MC68B50 ACIA Data

@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include "defs.h"		/* z80 emu system header */
 #include "memregion.h"		/* memory region handling */
+#include "storage.h"		/* SD card via serial port */
 #include "mc6850_console.h"	/* mc6850 emulation as console */
 
 
@@ -82,6 +83,7 @@ void system_poll( z80info * z80 )
 void io_init( z80info * z80 )
 {
     mc6850_console_init( z80 );
+    MassStorage_Init();
 }
 
 
@@ -111,9 +113,18 @@ void io_output( z80info *z80, byte haddr, byte laddr, byte data )
     case( kMC6850PortTxData ):	mc6850_out_console_data( data ); 	break;
     case( kMC6850PortControl ):	mc6850_out_console_control( data );	break;
 
+    /* Mass Storage */
+    case( kMassPortControl ): 	MassStorage_Control( data ); 	break;
+    case( kMassPortTxData ):	MassStorage_TX( data );		break;
+
+
     /* emulator control */
     case( 0xEE ): 
-	if( data == 0xF0 )	exit( 0 );
+	if( data == 0xF0 )
+	{
+		z_resetterm();
+		exit( 0 );
+	}
 	break;
 
     default:
@@ -147,9 +158,12 @@ void io_input(z80info *z80, byte haddr, byte laddr, byte *val )
     case( kMC6850PortRxData ):	*val = mc6850_in_console_data(); 	break;
     case( kMC6850PortStatus ):	*val = mc6850_in_console_status();	break;
 
+    /* Mass Storage */
+    case( kMassPortStatus ): 	*val = MassStorage_Status(); 	break;
+    case( kMassPortRxData ):	*val = MassStorage_RX();	break;
 
     /* emulator detection */
-    case( 0xEE ): *val = 'A';   break;
+    case( 0xEE ): *val = 'B';   break;
 
     default:
 	break;
