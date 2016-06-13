@@ -140,12 +140,17 @@ ploop:
 	xor	a
 	ld	e, a		; clear the autostart flag
 
-	rst	#0x08		; print nl
 	ld	bc, #0x0000	; reset our timeout
 
 	; handle the passed in byte...
 
 	in	a, (TermData)	; read byte
+	out	(TermData), a	; echo
+
+	push	af
+	rst	#0x08		; print nl
+	pop	af
+
 	cp	#'?		; '?' - help
 	jp 	z, ShowHelp
 
@@ -271,6 +276,11 @@ str_port:
 str_data:
 	.asciz	"Data: "
 
+str_address:
+	.asciz 	"Address: "
+
+str_spaces:
+	.asciz	" "
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -396,7 +406,7 @@ GetWordFromUser:
 ; ExamineMemory
 ;  prompt the user for an address
 ExamineMemory:
-	ld	hl, #str_memask
+	ld	hl, #str_address
 	rst	#0x10
 
 	; restore last address
@@ -427,12 +437,6 @@ exm0:
 	
 	jp	prompt
 
-
-str_memask:
-	.asciz 	"Enter address: "
-
-str_spaces:
-	.asciz	" "
 
 Exa20:
 	call	printHL
@@ -483,6 +487,32 @@ Exa20_1:
 ; PokeMemory
 
 PokeMemory:
+	ld	hl, #str_address
+	rst	#0x10
+	call	GetWordFromUser		; de has the word
+	push	de			; store it aside
+	cp	#0xff
+	jr	z, PM_nlret
+	rst	#0x08
+
+
+	ld	hl, #str_data
+	rst	#0x10
+	call 	GetByteFromUser		; b has the data
+	cp	#0xff
+	jr	z, PM_nlret
+	rst	#0x08
+
+	; and store it...
+	pop	hl
+	ld	(hl), b
+
+	jp	prompt
+
+	; if there was a problem, just return
+PM_nlret:
+	pop	de			; fix the stack
+	rst	#0x08
 	jp	prompt
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
