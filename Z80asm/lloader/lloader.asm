@@ -149,6 +149,8 @@ ploop:
 	cp	#'?		; '?' - help
 	jp 	z, ShowHelp
 
+	and	#0xDF		; make uppercase (mostly)
+
 	cp	#'B		; 'B' - Boot.
 	jp 	z, DoBoot
 
@@ -158,11 +160,19 @@ ploop:
 	cp	#'Q		; 'Q' - quit the emulator
 	jp	z, Quit
 
+
 	cp	#'E		; examine memory (hex dump)
 	jp	z, ExamineMemory
 
 	cp	#'P
 	jp	z, PokeMemory
+
+
+	cp	#'I
+	jp	z, InPort
+
+	cp	#'O
+	jp	z, OutPort
 
 	cp	#'7		; temp for now
 	jp	z, CopyROMToRAM
@@ -172,6 +182,7 @@ ploop:
 
 	cp	#'9
 	jp	z, EnableROM
+
 
 	cp	#'c		; 'c' - cat file
 	jp	z, catFile
@@ -211,6 +222,55 @@ ShowSysInfo:
 
 	call	ShowMemoryMap	; show the memory map
 	ret
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; InPort
+;	read in the specified port and print it out
+InPort:
+	ld	hl, #str_port
+	rst	#0x10
+	call 	GetByteFromUser
+	rst	#0x08
+
+	ld	c, b		; port to read from in a
+	in	a, (c)
+
+	push	af
+	ld	hl, #str_data
+	rst	#0x10
+	pop	af
+
+	call	printByte	; print the value
+	rst	#0x08		; println
+
+	jp	prompt
+
+; OutPort
+;	output the specified byte to the specified port
+OutPort:
+	ld	hl, #str_port
+	rst	#0x10
+	call 	GetByteFromUser
+	rst	#0x08
+	ld	c, b
+
+	ld	hl, #str_data
+	rst	#0x10
+	call 	GetByteFromUser
+	ld	a, b
+
+	out	(c),a
+
+	jp	prompt
+
+
+str_port:
+	.asciz	"Port: "
+
+str_data:
+	.asciz	"Data: "
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -579,18 +639,22 @@ str_menu:
 	.asciz  "[?] for help\r\n"
 
 str_help:
+	.ascii  "==== General ====\r\n"
 	.ascii  "  ? for help\r\n"
 	.ascii	"  Q to quit emulator\r\n"
 	.ascii	"  S for system info\r\n"
 	.ascii	"\r\n"
+	.ascii  "==== Mem, IO ====\r\n"
 	.ascii  "  E to examine memory\r\n"
 	.ascii  "  P to poke memory\r\n"
 	.ascii  "  I to read in from a port\r\n"
 	.ascii  "  O to write out to a port\r\n"
 	.ascii	"\r\n"
+	.ascii  "==== Boot ====\r\n"
 	.ascii	"  0 for basic32.rom\r\n"
 	.ascii	"  1 for basic56.rom\r\n"
 	.ascii	"\r\n"
+	.ascii  "==== ROM ====\r\n"
 	.ascii	"  7 Copy ROM to RAM\r\n"
 	.ascii	"  8 Disable ROM (64k RAM)\r\n"
 	.ascii	"  9 Enable ROM (56k RAM)\r\n"
