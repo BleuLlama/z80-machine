@@ -11,10 +11,10 @@
 ; ROM image.
 
 	.module Lloader
+
 .area	.CODE (ABS)
 
 .include "../Common/hardware.asm"	; hardware definitions
-
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; initial entry point
@@ -40,19 +40,23 @@ str_crlf:
 ;  hl should point to an 0x00 terminated string
 ;  this will send the string out through the ACIA
 termout:
+	push	af
+to_loop:
 	ld	a, (hl)		; get the next character
 	cp	#0x00		; is it a NULL?
 	jr	z, termz	; if yes, we're done here.
 	out	(TermData), a	; send it out.
 	inc	hl		; go to the next character
-	jr	termout		; do it again!
+	jr	to_loop		; do it again!
 termz:
+	pop	af
 	ret			; we're done, return!
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; RST 20 - send out string to SD drive
 .org 0x0020
 sdout:
+	push	af
 	ld	a, (hl)		; get the next character
 	cp	#0x00		; is it a null?
 	jr	z, sdz		; if yes, we're done
@@ -60,6 +64,7 @@ sdout:
 	inc	hl		; next character
 	jr	sdout		; do it again
 sdz:
+	pop	af
 	ret			; we're done, return!
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -107,12 +112,15 @@ coldboot:
 				; = 0x01 -> ROM is disabled
 	out	(RomDisable), a	; restore ROM to be enabled
 
-	ld	(LASTADDR), a
-	ld	(LASTADDR+1), a
-
 	;;;;;;;;;;;;;;;;;;;;	
 	; 2. setup stack for lloader
 	ld	sp, #STACK	; setup a stack pointer valid for all
+
+	
+	;;;;;;;;;;;;;;;;;;;;	
+	; setup misc variables
+	call	ExaInit
+
 
 	;;;;;;;;;;;;;;;;;;;;	
 	; 3. display splash text
@@ -151,23 +159,23 @@ ploop:
 	rst	#0x08		; print nl
 	pop	af
 
+		; General commands
 	cp	#'?		; '?' - help
 	jp 	z, ShowHelp
 
 	and	#0xDF		; make uppercase (mostly)
 
-	cp	#'B		; 'B' - Boot.
-	jp 	z, DoBoot
+	cp	#'Q		; 'Q' - quit the emulator
+	jp	z, Quit
 
 	cp	#'S		; 'S' - sysinfo
 	jp 	z, ShowSysInfo
 
-	cp	#'Q		; 'Q' - quit the emulator
-	jp	z, Quit
 
+		; memory, I/O
 
 	cp	#'E		; examine memory (hex dump)
-	jp	z, ExamineMemory
+	jp	z, ExaMem
 
 	cp	#'P
 	jp	z, PokeMemory
@@ -179,6 +187,8 @@ ploop:
 	cp	#'O
 	jp	z, OutPort
 
+		; ROM operations
+
 	cp	#'7		; temp for now
 	jp	z, CopyROMToRAM
 
@@ -188,10 +198,15 @@ ploop:
 	cp	#'9
 	jp	z, EnableROM
 
+		; test operations
 
 	cp	#'c		; 'c' - cat file
 	jp	z, catFile
 
+		; boot operations
+
+	cp	#'B		; 'B' - Boot.
+	jp 	z, DoBoot
 
 	cp	#'0		; '0' - basic32.rom
 	jp	z, DoBootBasic56
@@ -228,292 +243,6 @@ ShowSysInfo:
 	call	ShowMemoryMap	; show the memory map
 	ret
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-; InPort
-;	read in the specified port and print it out
-InPort:
-	ld	hl, #str_port
-	rst	#0x10
-	call 	GetByteFromUser
-	rst	#0x08
-
-	ld	c, b		; port to read from in a
-	in	a, (c)
-
-	push	af
-	ld	hl, #str_data
-	rst	#0x10
-	pop	af
-
-	call	printByte	; print the value
-	rst	#0x08		; println
-
-	jp	prompt
-
-; OutPort
-;	output the specified byte to the specified port
-OutPort:
-	ld	hl, #str_port
-	rst	#0x10
-	call 	GetByteFromUser
-	rst	#0x08
-	ld	c, b
-
-	ld	hl, #str_data
-	rst	#0x10
-	call 	GetByteFromUser
-	ld	a, b
-
-	out	(c),a
-
-	jp	prompt
-
-
-str_port:
-	.asciz	"Port: "
-
-str_data:
-	.asciz	"Data: "
-
-str_address:
-	.asciz 	"Address: "
-
-str_spaces:
-	.asciz	" "
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-; GetNibbleFromUser
-; returns a byte read from the user to b
-; if user hits 'enter' (default value) then a is 0xFF
-GetNibbleFromUser:
-	xor	a		; reset our return flag
-	ld	b, #0x00	; nibble entered by user
-GNFU_0:
-	in	a, (TermStatus)	; ready to read a byte?
-	and	#DataReady	; see if a byte is available
-	jr	z, GNFU_0	; nope. try again
-
-	in	a, (TermData)	; get the character from the console
-
-
-	cp	#0x0a
-	jr	z, GNFU_Break	; return hit
-	cp	#0x0d
-	jr	z, GNFU_Break	; return hit
-	
-	cp	#'0
-	jr	c, GNFU_0	; < 0, try again
-
-	cp	#'9 + 1
-	jr	c, GNFU_g0	; got 0..9
-
-	cp	#'A
-	jr	c, GNFU_0	; between '9' and 'A', try again
-	
-	cp	#'F + 1
-	jr	c, GNFU_gAuc	; got A-F
-
-	cp	#'a 
-	jr	c, GNFU_0	; between 'F' and 'a', try again
-
-	cp	#'f + 1
-	jr	c, GNFU_galc	; got a-f
-
-	jr	GNFU_0		; not valid, retry
-
-GNFU_g0:			; '0'..'9'
-	sub	#'0
-	ld	b, a
-	xor	a
-	ret
-
-GNFU_galc:			; 'a'..'f'
-	and	#0x4F		; make uppercase
-GNFU_gAuc:			; 'A'..'F'
-	add	#10-'A
-	ld	b, a
-	xor	a
-	ret
-
-GNFU_Break:
-	ld	a, #0xff
-	ret
-
-
-; GetByteFromUser
-;	returns a value in b
-;	returns code in a,  0 if ok, FF if no value
-GetByteFromUser:
-	; read top nibble
-	call	GetNibbleFromUser
-	cp	#0xFF
-	ret	z		; user escaped
-
-	
-	ld	a, b
-	call	printNibble
-	sla	a
-	sla	a
-	sla	a
-	sla	a
-	ld	d, a		; store in top half of d
-
-	; read bottom nibble
-	call	GetNibbleFromUser
-	cp	#0xFF
-	ret	z		; user escaped
-
-	ld	a, b
-
-	; combine the two
-	ld	a, b
-	call	printNibble
-	and	#0x0F		; just in case..
-	add	d
-
-	ld	b, a		; store the full result in b
-
-	; return
-	xor	a		; just in case, clear a
-	ret
-
-
-; GetWordFromuser
-; returns a word read from the user to de
-; if user hits 'enter' (default value) then a is 0xFF
-GetWordFromUser:
-	; read top byte
-	call	GetByteFromUser
-	cp	#0xFF
-	ret	z		; user hit return, just return
-	ld	d, b
-
-	; read bottom byte
-	push	de
-	call	GetByteFromUser
-	cp	#0xFF
-	ret	z
-	pop	de
-	ld	e, b
-
-	; if we got here, DE = two nibbles
-	xor	a
-	ret
-
-
-; ExamineMemory
-;  prompt the user for an address
-ExamineMemory:
-	ld	hl, #str_address
-	rst	#0x10
-
-	; restore last address
-	ld	a, (LASTADDR)
-	ld	h, a
-	ld	a, (LASTADDR+1)
-	ld	l, a
-
-	call	GetWordFromUser
-	cp	#0xFF		; if returned FF, use HL, otherwise new DE
-	jr	z, exmNoDE
-	push	de
-	pop	hl
-
-exmNoDE:
-	ld	b, #16
-exm0:
-	push	bc
-
-	push	hl
-	rst	#0x08
-	pop	hl
-
-	call	Exa20
-
-	pop	bc
-	djnz	exm0
-	
-	jp	prompt
-
-
-Exa20:
-	call	printHL
-	push	hl
-	ld	hl, #str_spaces
-	rst	#0x10
-	rst	#0x10
-	pop	hl
-
-	push	hl
-	ld	b, #0x10
-
-Exa20_0:
-	ld	a, (hl)
-	call	printByte
-	push	hl
-	 ld	hl, #str_spaces
-	 rst	#0x10
-	
-	; add an extra space on the middle byte
-	 ld	a, b
-	 cp	#0x09
-	 jr 	nz, Exa20_1
-
-	 ld	hl, #str_spaces
-	 rst	#0x10
-	
-Exa20_1:
-	pop	hl
-	inc	hl
-	djnz	Exa20_0
-
-	pop	hl
-
-	ld	de, #0x10
-	add	hl, de
-
-	; store the last addr back
-	ld	a, h
-	ld	(LASTADDR), a
-	ld	a, l
-	ld	(LASTADDR+1), a
-	
-	ret
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-; PokeMemory
-
-PokeMemory:
-	ld	hl, #str_address
-	rst	#0x10
-	call	GetWordFromUser		; de has the word
-	push	de			; store it aside
-	cp	#0xff
-	jr	z, PM_nlret
-	rst	#0x08
-
-
-	ld	hl, #str_data
-	rst	#0x10
-	call 	GetByteFromUser		; b has the data
-	cp	#0xff
-	jr	z, PM_nlret
-	rst	#0x08
-
-	; and store it...
-	pop	hl
-	ld	(hl), b
-
-	jp	prompt
-
-	; if there was a problem, just return
-PM_nlret:
-	pop	de			; fix the stack
-	rst	#0x08
-	jp	prompt
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -544,6 +273,7 @@ CR2Ra:
 	
 	; we're done. return
 	jp	prompt
+
 
 ; DisableROM
 ;	set the ROM disable flag
@@ -609,8 +339,8 @@ bootloop:
 	inc	hl		; next position
 	
 	; uncomment if you want dots printed while it loads...
-	;ld	a, #0x2e	; '.'
-	;ut	(TermData), a	; send it out.
+	  ld	a, #0x2e	; '.'
+	  out	(TermData), a	; send it out.
 
 	jp	bootloop	; and do the next byte
 
@@ -636,7 +366,7 @@ catFile:
 	ld	hl, #cmd_bootread ; open for read
 	rst	#0x20		; send to SD command
 
-bar:
+CF0:
 	; check for more bytes
 	in	a, (SDStatus)
 	and	#DataReady	; more bytes to read?
@@ -647,13 +377,15 @@ bar:
 	out	(TermData), a	; send it out.
 	;ld	(hl), a		; store it out
 	inc	hl		; next position
-	jr	bar
+	jr	CF0		; repeat
 	
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Text strings
 
 ; Version history
+;   v004 2016-06-11 - Hex dump of memory, in, out, poke
+;   v003            - more options
 ;   v002 2016-05-10 - usability cleanups
 ;   v001 2016-05-09 - initial version, functional
 
@@ -728,6 +460,10 @@ str_nofile:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 .include "memprobe.asm"
+.include "examine.asm"
+.include "poke.asm"
+.include "ports.asm"
+.include "input.asm"
 .include "print.asm"
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

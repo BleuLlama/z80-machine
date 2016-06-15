@@ -25,7 +25,7 @@ romdir:
 
 clean:
 	@echo "Cleaning up all products"
-	-rm -rf ROMs
+	-rm -rf $(ROMSDIR)
 	for dir in $(ROMDIRS); do \
                $(MAKE) -C $$dir clean; \
              done

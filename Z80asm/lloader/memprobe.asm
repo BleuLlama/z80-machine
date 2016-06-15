@@ -4,11 +4,6 @@
 ;          2016-06-10 Scott Lawrence
 ;
 ;  This code is free for any use. MIT License, etc.
-;
-; this ROM loader isn't meant to be the end-all, be-all, 
-; it's just something that can easily fit into the 
-; boot ROM, that can be used to kick off another, better
-; ROM image.
 
 	.module MemProbe
 

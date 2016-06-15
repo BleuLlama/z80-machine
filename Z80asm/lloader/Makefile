@@ -3,4 +3,10 @@
 
 TARGBASE := lloader
 
+DEPNENDS := \
+	    examine.asm \
+	    input.asm \
+	    memprobe.asm \
+	    print.asm
+
 include ../Common/approm.mk

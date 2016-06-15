@@ -1,4 +1,4 @@
-
+	.module Banks
 CopyLoc = 0xfff0	; make sure there's enoguh space for the routine
 
         ;;;;;;;;;;;;;;;;;;;;
