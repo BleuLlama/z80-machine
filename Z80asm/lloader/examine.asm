@@ -25,7 +25,7 @@ ExaInit:
 ;  prompt the user for what they want to do
 ExaMem:
 	ld	hl, #str_exa_prompt
-	rst	#0x10
+	call	Print
 EM0:
 	in	a, (TermStatus)	; ready to read a byte?
 	and	#DataReady	; see if a byte is available
@@ -33,10 +33,10 @@ EM0:
 
 	in	a, (TermData)
 	;out	(TermData), a	; echo
-	;rst	0x08		; newline
+	;call	PrintNL
 
 	cp	#'q
-	jr	z, EM_quit
+	ret	z
 	
 	cp	#' 
 	jr	z, EM_next
@@ -52,11 +52,6 @@ EM0:
 	jp	ExaMem		; not valid, try again
 
 
-;;;;;;;;;;;;;;;;;;;;
-; quit from the ExaMem applet
-EM_quit:
-	jp	prompt
-
 
 ;;;;;;;;;;;;;;;;;;;;
 ; go to the next address block
@@ -71,9 +66,9 @@ EM_next:
 ;;;;;;;;;;;;;;;;;;;;
 ; get new address from the user
 EM_addr:
-	rst	0x08		; newline
+	call	PrintNL
 	ld	hl, #str_address
-	rst	#0x10
+	call	Print
 
 	; restore last address (in case user hits return)
 	ld	a, (LASTADDR)
@@ -97,7 +92,7 @@ EB_Loop:
 	push	bc
 
 	push	hl
-	rst	#0x08
+	call	PrintNL
 	pop	hl
 
 	call	Exa_Line	; print out a line of data
@@ -119,8 +114,8 @@ Exa_Line:			; print out one line of memory
 	call	printHLnoX	;  print start address
 	push	hl
 	ld	hl, #str_spaces
-	rst	#0x10
-	rst	#0x10
+	call	Print
+	call	Print
 	pop	hl
 
 	push	hl		; store aside start address
@@ -132,7 +127,7 @@ EL_OneByte:
 	call	printByte
 	push	hl
 	 ld	hl, #str_spaces
-	 rst	#0x10
+	 call	Print
 	
 	; add an extra space on the middle byte
 	 ld	a, b
@@ -140,7 +135,7 @@ EL_OneByte:
 	 jr 	nz, EL_NoExtraSpace
 
 	 ld	hl, #str_spaces
-	 rst	#0x10
+	 call	Print
 	
 EL_NoExtraSpace:
 	pop	hl

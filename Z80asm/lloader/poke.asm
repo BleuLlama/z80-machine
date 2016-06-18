@@ -13,30 +13,30 @@
 
 PokeMemory:
 	ld	hl, #str_address
-	rst	#0x10
+	call	Print
 	call	GetWordFromUser		; de has the word
 	push	de			; store it aside
 	cp	#0xff
 	jr	z, PM_nlret
-	rst	#0x08
+	call	PrintNL
 
 
 	ld	hl, #str_data
-	rst	#0x10
+	call	Print
 	call 	GetByteFromUser		; b has the data
 	cp	#0xff
 	jr	z, PM_nlret
-	rst	#0x08
+	call	PrintNL
 
 	; and store it...
 	pop	hl
 	ld	(hl), b
 
-	jp	prompt
+	ret
 
 	; if there was a problem, just return
 PM_nlret:
 	pop	de			; fix the stack
-	rst	#0x08
-	jp	prompt
+	call	PrintNL
+	ret
 

@@ -13,41 +13,41 @@
 ;	read in the specified port and print it out
 InPort:
 	ld	hl, #str_port	; request a byte for the port
-	rst	#0x10
+	call	Print
 	call 	GetByteFromUser
-	rst	#0x08
+	call	PrintNL
 
 	ld	c, b		; port to read from in a
 	in	a, (c)
 
 	push	af		; print out the port data
 	ld	hl, #str_data
-	rst	#0x10
+	call	Print
 	pop	af
 
 	call	printByte	; print the value
-	rst	#0x08		; println
+	call	PrintNL
 
-	jp	prompt		; next...
+	ret			; next
 
 ; OutPort
 ;	output the specified byte to the specified port
 OutPort:
 	ld	hl, #str_port	; request a byte for the port
-	rst	#0x10
+	call	Print
 	call 	GetByteFromUser
-	rst	#0x08
+	call	PrintNL
 	ld	c, b
 
 	ld	hl, #str_data	; request the port data
-	rst	#0x10
+	call	Print
 	call 	GetByteFromUser
 	ld	a, b
 
 	out	(c),a		; send it out
-	rst	#0x08		; println
+	call	PrintNL
 
-	jp	prompt		; next...
+	ret
 
 
 str_port:

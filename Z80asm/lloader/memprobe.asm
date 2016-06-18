@@ -24,7 +24,7 @@
 	; send the memory map out to the console
 ShowMemoryMap:
 	ld	hl, #str_memheader
-	rst	#0x10
+	call	Print
 	
 	xor	a
 	ld	h, a
@@ -75,8 +75,8 @@ memram:
 	
 
 memnext:
-	rst	#0x10		; print it out
-	rst	#0x08		; print CRLF
+	call	Print 		; print it out
+	call	PrintNL
 
 	pop 	hl
 	; restore the value just in case it was ram
@@ -85,14 +85,14 @@ memnext:
 	; next
 	ld	a, h
 	cp	#0xF0
-	jp	z, prompt	; we're done...
+	ret	z 		; we're done...
 
 	add	a, #0x10
 	ld	h, a		; hl += $1000
 	push	hl
 	jr	memloop
 
-	jp	prompt
+	ret
 
 
 str_ram: .asciz	"RAM"

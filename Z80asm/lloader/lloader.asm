@@ -16,19 +16,27 @@
 
 .include "../Common/hardware.asm"	; hardware definitions
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Code configuration
+
+; set to 1 if we're building emulation version of the ROM
+Emulation = 1
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; initial entry point
 
 ; RST 00 - Cold Boot
 .org 0x0000			; start at 0x0000
 	di			; disable interrupts
-	jp	coldboot	; and do the stuff
+	jp	ColdBoot	; and do the stuff
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; RST 08 - println( "\r\n" );
 .org 0x0008 	; send out a newline
+PrintNL:
 	ld	hl, #str_crlf	; set up the newline string
-	jr	termout		
+	jr	Print		
 
 str_crlf:
 	.byte 	0x0d, 0x0a, 0x00	; "\r\n"
@@ -36,10 +44,10 @@ str_crlf:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; RST 10 - println( (hl) );
 .org 0x0010
-; termout
+; print
 ;  hl should point to an 0x00 terminated string
 ;  this will send the string out through the ACIA
-termout:
+Print:
 	push	af
 to_loop:
 	ld	a, (hl)		; get the next character
@@ -74,8 +82,6 @@ sdz:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; RST 30 - unused
 .org 0x0030
-	ret
-.byte	0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; RST 38 - Interrupt handler for console input
@@ -101,78 +107,177 @@ STACK 	= 0xF800
 USERRAM = 0xF802
 LASTADDR = USERRAM + 1
 
+
+GetCh:
+	in	a, (TermStatus)	; ready to read a byte?
+	and	#DataReady	; see if a byte is available
+
+	jr	z, GetCh	; nope. try again
+	in	a, (TermData)	; get it!
+	ret
+
+ToUpper:
+	and	#0xDF		; make uppercase (mostly)
+	ret
+
+EchoA:
+	out	(TermData), a	; echo
+	ret
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; coldboot - the main code block
-.org 0x100
-coldboot:
-	;;;;;;;;;;;;;;;;;;;;	
-	; 1. setup 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; ColdBoot - the main code block
+ColdBoot:
+	; setup ROM/RAM config
 	ld	a, #0x00	; bit 0, 0x01 is ROM Disable
 				; = 0x00 -> ROM is enabled
 				; = 0x01 -> ROM is disabled
 	out	(RomDisable), a	; restore ROM to be enabled
 
-	;;;;;;;;;;;;;;;;;;;;	
-	; 2. setup stack for lloader
 	ld	sp, #STACK	; setup a stack pointer valid for all
 
-	
-	;;;;;;;;;;;;;;;;;;;;	
-	; setup misc variables
+	; Misc Subsystem one-time setup
 	call	ExaInit
 
-
-	;;;;;;;;;;;;;;;;;;;;	
-	; 3. display splash text
-	rst	#0x08		; newline
+	; display startup splash
+	call	PrintNL
 	ld	hl, #str_splash
-	rst	#0x10		; print to terminal
+	call	Print
 
+	; and run the main menu
+	jr	MenuMain
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+str_prompt:
+	.asciz  "\r\nLL> "
+
+str_menu:
+	.ascii	"== Main ==\r\n"
+	.ascii	"  [B]oot options \r\n"
+	.ascii  "  [D]iagnostics\r\n"
+	.ascii	"  [M]em and [P]orts\r\n"
+.if( Emulation )
+	.ascii	"  [Q]uit emulator\r\n"	; should remove for burnable ROM
+.endif
+	.byte	0x00
 
 	;;;;;;;;;;;;;;;;;;;;	
-	; 4. display utility menu, get command
-main:
+	; display menu, get command
+MenuMain:
 	ld	hl, #str_menu
-	rst	#0x10		; print to terminal
+	call	Print
 
-prompt:
+MM_prompt:
 	ld	hl, #str_prompt
-	rst	#0x10		; print with newline
+	call	Print
 
-ploop:
-	in	a, (TermStatus)	; ready to read a byte?
-	and	#DataReady	; see if a byte is available
-
-	jr	z, ploop	; nope. try again
-
-	xor	a
-	ld	e, a		; clear the autostart flag
-
-	ld	bc, #0x0000	; reset our timeout
+	call	GetCh		; get user input
+	call	EchoA		; echo it out
+	call	PrintNL
 
 	; handle the passed in byte...
 
-	in	a, (TermData)	; read byte
-	out	(TermData), a	; echo
-
-	push	af
-	rst	#0x08		; print nl
-	pop	af
-
 		; General commands
 	cp	#'?		; '?' - help
-	jp 	z, ShowHelp
+	jp	z, MenuMain
 
-	and	#0xDF		; make uppercase (mostly)
+	call	ToUpper
 
+.if( Emulation )
 	cp	#'Q		; 'Q' - quit the emulator
 	jp	z, Quit
+.endif
+
+	cp	#'D
+	jp	z, MenuDiags
+
+	cp	#'M
+	jp	z, MenuMemory
+
+	cp	#'P
+	jp	z, MenuPorts
+
+	jr	MM_prompt
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+str_menuD: ;Diag Menu
+	.ascii  "== Diagnostics ==\r\n"
+	.ascii	"  [S]ystem info\r\n"
+	.ascii	"  [C]opy ROM to RAM\r\n"
+	.ascii	"  [D]isable ROM (64k RAM)\r\n"
+	.ascii	"  [E]nable ROM (56k RAM)\r\n"
+	.ascii	"  [X]it this menu\r\n"
+	.byte	0x00
+
+MenuDiags:
+	ld	hl, #str_menuD
+	call	Print
+MD_prompt:
+	ld	hl, #str_prompt
+	call	Print
+
+	call	GetCh
+	call	EchoA
+	call	PrintNL
+
+	cp	#'?
+	jp	z, MenuDiags
+
+	call	ToUpper
+
+	cp	#'X
+	jp	z, MenuMain
 
 	cp	#'S		; 'S' - sysinfo
 	jp 	z, ShowSysInfo
 
+	cp	#'C
+	jp	z, CopyROMToRAM
 
-		; memory, I/O
+	cp	#'D
+	jp	z, DisableROM
+
+	cp	#'E
+	jp	z, EnableROM
+
+
+	cp	#'F 		; ??? maybe make a file menu
+	jp	z, catFile
+
+
+	jr	MD_prompt
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+str_menuM: ;mem and ports
+	.ascii  "== Memory ==\r\n"
+	.ascii  "  [E]xamine memory\r\n"
+	.ascii  "  [P]oke memory\r\n"
+	.byte	0x00
+
+MenuMemory:
+	ld	hl, #str_menuM
+	call	Print
+Main_prompt:
+	ld	hl, #str_prompt
+	call	Print
+
+	call	GetCh
+	call	EchoA
+	call	PrintNL
+
+	cp	#'?
+	jp	z, MenuMemory
+
+	call	ToUpper
+
+	cp	#'X
+	jp	z, MenuMain
 
 	cp	#'E		; examine memory (hex dump)
 	jp	z, ExaMem
@@ -180,6 +285,33 @@ ploop:
 	cp	#'P
 	jp	z, PokeMemory
 
+	jr	Main_prompt
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+str_menuP:
+	.ascii  "== Port IO ==\r\n"
+	.ascii  "  [I]nput from a port\r\n"
+	.ascii  "  [O]utput to a port\r\n"
+	.byte	0x00
+
+MenuPorts:
+	ld	hl, #str_menuP
+	call	Print
+MP_prompt:
+	ld	hl, #str_prompt
+	call	Print
+
+	call	GetCh
+	call	EchoA
+	call	PrintNL
+
+	cp	#'?
+	jp	z, MenuPorts
+
+	call	ToUpper
+
+	cp	#'X
+	jp	z, MenuMain
 
 	cp	#'I
 	jp	z, InPort
@@ -187,38 +319,52 @@ ploop:
 	cp	#'O
 	jp	z, OutPort
 
-		; ROM operations
+	jr	MP_prompt
 
-	cp	#'7		; temp for now
-	jp	z, CopyROMToRAM
 
-	cp	#'8
-	jp	z, DisableROM
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+str_menuB: ;boot options
+	.ascii  "== Boot ==\r\n"
+	.ascii	"  [B]oot\r\n"
+	.ascii	"  [3]2k basic.32.rom\r\n"
+	.ascii	"  [5]6k basic.56.rom\r\n"
+	.byte	0x00
 
-	cp	#'9
-	jp	z, EnableROM
+MenuBoot:
+	ld	hl, #str_menuB
+	call	Print
+MB_prompt:
+	ld	hl, #str_prompt
+	call	Print
 
-		; test operations
+	call	GetCh
+	call	EchoA
+	call	PrintNL
 
-	cp	#'c		; 'c' - cat file
-	jp	z, catFile
+	cp	#'?
+	jp	z, MenuBoot
 
-		; boot operations
+	call	ToUpper
+
+	cp	#'X
+	jp	z, MenuMain
 
 	cp	#'B		; 'B' - Boot.
 	jp 	z, DoBoot
 
-	cp	#'0		; '0' - basic32.rom
+	cp	#'3		; '0' - basic32.rom
 	jp	z, DoBootBasic56
 
-	cp	#'1		; '1' - basic56.rom
+	cp	#'5		; '1' - basic56.rom
 	jp	z, DoBootBasic56
 
-	cp	#'2		; '2' - iotest.rom
+	cp	#'i		; '2' - iotest.rom
 	jp	z, DoBootIotest
 
-	jr	prompt		; ask again...
-	
+	jr	MB_prompt
+
+
+
 
 	;;;;;;;;;;;;;;;
 	; quit from the rom (halt)
@@ -228,17 +374,10 @@ Quit:
 	halt			; rc2014sim will exit on a halt
 
 	;;;;;;;;;;;;;;;
-	; show help subroutine
-ShowHelp:
-	ld	hl, #str_help
-	rst	#0x10
-	jr 	prompt
-
-	;;;;;;;;;;;;;;;
 	; show sysinfo subroutine
 ShowSysInfo:
 	ld	hl, #str_splash
-	rst	#0x10
+	call	Print
 
 	call	ShowMemoryMap	; show the memory map
 	ret
@@ -266,13 +405,13 @@ CR2Ra:
 
 	; now patch the RAM image of the ROM so if we reset, it will
 	; continue to be in RAM mode...
-	ld	hl, #coldboot	; 0x3E  (ld a,      )
+	ld	hl, #ColdBoot	; 0x3E  (ld a,      )
 	inc	hl		; 0x00	(    , #0x00)
 	ld	a, #0x01	; disable RAM value
 	ld	(hl), a		; change the opcode to  "ld a, #0x01"
 	
 	; we're done. return
-	jp	prompt
+	ret
 
 
 ; DisableROM
@@ -280,7 +419,7 @@ CR2Ra:
 DisableROM:
 	ld	a, #01
 	out	(RomDisable), a
-	jp	prompt
+	ret
 
 
 ; EnableROM
@@ -288,7 +427,7 @@ DisableROM:
 EnableROM:
 	xor	a
 	out	(RomDisable), a
-	jp	prompt
+	ret
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -325,8 +464,8 @@ DoBootB:
 	and	#DataReady
 	jr	nz, bootloop	; make sure we have something loaded
 	ld	hl, #str_nofile	; print out an error message
-	rst	#0x10
-	jp	prompt		; and prompt again
+	call	Print
+	ret
 	
 
 bootloop:
@@ -349,7 +488,7 @@ bootloop:
 	; 6. Loading is completed.
 LoadDone:
 	ld	hl, #str_loaded
-	rst	#0x10
+	call	Print
 
 	;;;;;;;;;;;;;;;;;;;;
 	; 7. Swap the ROM out
@@ -370,7 +509,7 @@ CF0:
 	; check for more bytes
 	in	a, (SDStatus)
 	and	#DataReady	; more bytes to read?
-	jp	z, prompt	; nope. exit out
+	ret	z 		; nope. exit out
 	
 	; load a byte from the file, print it out
 	in	a, (SDData)	; get the file data byte
@@ -384,42 +523,21 @@ CF0:
 ; Text strings
 
 ; Version history
+;   v005 2016-06-16 - New menus?
 ;   v004 2016-06-11 - Hex dump of memory, in, out, poke
 ;   v003            - more options
 ;   v002 2016-05-10 - usability cleanups
 ;   v001 2016-05-09 - initial version, functional
 
 str_splash:
-	.ascii	"Boot Lloader/Utilities for RC2014-LL\r\n"
-	.ascii	"  v004 2016-June-10  Scott Lawrence\r\n"
+	.ascii	"Lloader Shell for RC2014-LL\r\n"
+	.ascii	"  v005 2016-June-16  Scott Lawrence\r\n"
 	.asciz  "\r\n"
 
-str_prompt:
-	.asciz  "\r\nLL> "
-
-str_menu:
-	.asciz  "[?] for help\r\n"
-
+	
 str_help:
-	.ascii  "==== General ====\r\n"
-	.ascii  "  ? for help\r\n"
-	.ascii	"  Q to quit emulator\r\n"
-	.ascii	"  S for system info\r\n"
-	.ascii	"\r\n"
-	.ascii  "==== Mem, IO ====\r\n"
-	.ascii  "  E to examine memory\r\n"
-	.ascii  "  P to poke memory\r\n"
-	.ascii  "  I to read in from a port\r\n"
-	.ascii  "  O to write out to a port\r\n"
-	.ascii	"\r\n"
-	.ascii  "==== Boot ====\r\n"
-	.ascii	"  0 for basic32.rom\r\n"
-	.ascii	"  1 for basic56.rom\r\n"
 	.ascii	"\r\n"
 	.ascii  "==== ROM ====\r\n"
-	.ascii	"  7 Copy ROM to RAM\r\n"
-	.ascii	"  8 Disable ROM (64k RAM)\r\n"
-	.ascii	"  9 Enable ROM (56k RAM)\r\n"
 
 	;ascii  "  C for catalog\r\n"
 	;ascii  "  H for hexdump\r\n"
@@ -445,10 +563,6 @@ cmd_bootread:
 
 cmd_bootsave:
 	.asciz	"~S\n"
-
-str_loading:
-	.ascii 	"Loading \"boot.rom\" from SD...\r\n"
-	.asciz	"Storing at $0000 + $4000\r\n"
 
 str_loaded:
 	.asciz 	"Done loading. Restarting...\n\r"
