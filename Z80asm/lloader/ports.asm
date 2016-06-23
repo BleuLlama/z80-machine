@@ -28,6 +28,7 @@ InPort:
 	call	printByte	; print the value
 	call	PrintNL
 
+	xor	a
 	ret			; next
 
 ; OutPort
@@ -47,6 +48,7 @@ OutPort:
 	out	(c),a		; send it out
 	call	PrintNL
 
+	xor	a
 	ret
 
 

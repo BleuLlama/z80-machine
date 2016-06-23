@@ -63,16 +63,15 @@ termz:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; RST 20 - send out string to SD drive
 .org 0x0020
-sdout:
-	push	af
+	
+SendSDCommand:
 	ld	a, (hl)		; get the next character
 	cp	#0x00		; is it a null?
 	jr	z, sdz		; if yes, we're done
 	out	(SDData), a	; send it out
 	inc	hl		; next character
-	jr	sdout		; do it again
+	jr	SendSDCommand	; do it again
 sdz:
-	pop	af
 	ret			; we're done, return!
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -152,7 +151,7 @@ ColdBoot:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 str_prompt:
-	.asciz  "\r\nLL> "
+	.asciz  "LL> "
 
 str_menu:
 	.ascii	"== Main ==\r\n"
@@ -162,6 +161,7 @@ str_menu:
 .if( Emulation )
 	.ascii	"  [Q]uit emulator\r\n"	; should remove for burnable ROM
 .endif
+	.ascii	"  [?] for menu\r\n"
 	.byte	0x00
 
 	;;;;;;;;;;;;;;;;;;;;	
@@ -171,6 +171,7 @@ MenuMain:
 	call	Print
 
 MM_prompt:
+	call	PrintNL
 	ld	hl, #str_prompt
 	call	Print
 
@@ -191,32 +192,48 @@ MM_prompt:
 	jp	z, Quit
 .endif
 
+	cp	#'B
+	call	z, MenuBoot
+
 	cp	#'D
-	jp	z, MenuDiags
+	call	z, MenuDiags
 
 	cp	#'M
-	jp	z, MenuMemory
+	call	z, MenuMemory
 
 	cp	#'P
-	jp	z, MenuPorts
+	call	z, MenuPorts
 
 	jr	MM_prompt
+
+	; helper to return with a==0
+ClrARet:
+	xor	a
+	ret
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 str_menuD: ;Diag Menu
 	.ascii  "== Diagnostics ==\r\n"
 	.ascii	"  [S]ystem info\r\n"
+	;.ascii	"  [M]emory Test\r\n"
 	.ascii	"  [C]opy ROM to RAM\r\n"
 	.ascii	"  [D]isable ROM (64k RAM)\r\n"
 	.ascii	"  [E]nable ROM (56k RAM)\r\n"
+	.ascii	"  [F]ile SD tests\r\n"
 	.ascii	"  [X]it this menu\r\n"
 	.byte	0x00
+
+str_MDprompt:
+	.asciz	"DIAG "
 
 MenuDiags:
 	ld	hl, #str_menuD
 	call	Print
 MD_prompt:
+	call	PrintNL
+	ld	hl, #str_MDprompt
+	call	Print
 	ld	hl, #str_prompt
 	call	Print
 
@@ -230,26 +247,65 @@ MD_prompt:
 	call	ToUpper
 
 	cp	#'X
-	jp	z, MenuMain
+	jp	z, ClrARet
 
 	cp	#'S		; 'S' - sysinfo
-	jp 	z, ShowSysInfo
+	call 	z, ShowSysInfo
 
 	cp	#'C
-	jp	z, CopyROMToRAM
+	call	z, CopyROMToRAM
 
 	cp	#'D
-	jp	z, DisableROM
+	call	z, DisableROM
 
 	cp	#'E
-	jp	z, EnableROM
-
+	call	z, EnableROM
 
 	cp	#'F 		; ??? maybe make a file menu
-	jp	z, catFile
-
+	call	z, MenuFile
 
 	jr	MD_prompt
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+str_menuF: ; File menu
+	.ascii  "== Files ==\r\n"
+	.ascii	"  [C]at test.txt\r\n"
+	.ascii	"  [D]irectory list\r\n"
+	.ascii	"  [X]it this menu\r\n"
+	.byte	0x00
+
+str_MFprompt:
+	.asciz	"FILE "
+
+MenuFile:
+	ld	hl, #str_menuF
+	call	Print
+MF_prompt:
+	call	PrintNL
+	ld	hl, #str_MFprompt
+	call	Print
+	ld	hl, #str_prompt
+	call	Print
+
+	call	GetCh
+	call	EchoA
+	call	PrintNL
+
+	cp	#'?
+	jp	z, MenuFile
+
+	call	ToUpper
+
+	cp	#'X
+	jp	z, ClrARet
+
+	cp	#'C
+	call	z, catFile
+
+	cp	#'D
+	call	z, directoryList
+
+	jr	MF_prompt
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -258,12 +314,19 @@ str_menuM: ;mem and ports
 	.ascii  "== Memory ==\r\n"
 	.ascii  "  [E]xamine memory\r\n"
 	.ascii  "  [P]oke memory\r\n"
+	.ascii	"  [X]it this menu\r\n"
 	.byte	0x00
+
+str_MEMprompt:
+	.asciz	"MEM "
 
 MenuMemory:
 	ld	hl, #str_menuM
 	call	Print
-Main_prompt:
+Mem_prompt:
+	call	PrintNL
+	ld	hl, #str_MEMprompt
+	call	Print
 	ld	hl, #str_prompt
 	call	Print
 
@@ -277,27 +340,34 @@ Main_prompt:
 	call	ToUpper
 
 	cp	#'X
-	jp	z, MenuMain
+	jp	z, ClrARet
 
 	cp	#'E		; examine memory (hex dump)
-	jp	z, ExaMem
+	call	z, ExaMem
 
 	cp	#'P
-	jp	z, PokeMemory
+	call	z, PokeMemory
 
-	jr	Main_prompt
+	jr	Mem_prompt
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 str_menuP:
 	.ascii  "== Port IO ==\r\n"
 	.ascii  "  [I]nput from a port\r\n"
 	.ascii  "  [O]utput to a port\r\n"
+	.ascii	"  [X]it this menu\r\n"
 	.byte	0x00
+
+str_MPprompt:
+	.asciz	"PORT "
 
 MenuPorts:
 	ld	hl, #str_menuP
 	call	Print
 MP_prompt:
+	call	PrintNL
+	ld	hl, #str_MPprompt
+	call	Print
 	ld	hl, #str_prompt
 	call	Print
 
@@ -311,13 +381,13 @@ MP_prompt:
 	call	ToUpper
 
 	cp	#'X
-	jp	z, MenuMain
+	jp	z, ClrARet	; exit. return
 
 	cp	#'I
-	jp	z, InPort
+	call	z, InPort
 
 	cp	#'O
-	jp	z, OutPort
+	call	z, OutPort
 
 	jr	MP_prompt
 
@@ -328,12 +398,19 @@ str_menuB: ;boot options
 	.ascii	"  [B]oot\r\n"
 	.ascii	"  [3]2k basic.32.rom\r\n"
 	.ascii	"  [5]6k basic.56.rom\r\n"
+	.ascii	"  [X]it this menu\r\n"
 	.byte	0x00
+
+str_BOprompt:
+	.asciz	"BOOT "
 
 MenuBoot:
 	ld	hl, #str_menuB
 	call	Print
 MB_prompt:
+	call	PrintNL
+	ld	hl, #str_BOprompt
+	call	Print
 	ld	hl, #str_prompt
 	call	Print
 
@@ -347,31 +424,33 @@ MB_prompt:
 	call	ToUpper
 
 	cp	#'X
-	jp	z, MenuMain
+	jp	z, ClrARet
 
 	cp	#'B		; 'B' - Boot.
-	jp 	z, DoBoot
+	call 	z, DoBoot
 
 	cp	#'3		; '0' - basic32.rom
-	jp	z, DoBootBasic56
+	call	z, DoBootBasic32
 
 	cp	#'5		; '1' - basic56.rom
-	jp	z, DoBootBasic56
+	call	z, DoBootBasic56
 
 	cp	#'i		; '2' - iotest.rom
-	jp	z, DoBootIotest
+	call	z, DoBootIotest
 
 	jr	MB_prompt
 
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-
+.if( Emulation )
 	;;;;;;;;;;;;;;;
 	; quit from the rom (halt)
 Quit:
 	ld	a, #0xF0	; F0 = flag to exit
 	out	(EmulatorControl), a
 	halt			; rc2014sim will exit on a halt
+.endif
 
 	;;;;;;;;;;;;;;;
 	; show sysinfo subroutine
@@ -380,10 +459,18 @@ ShowSysInfo:
 	call	Print
 
 	call	ShowMemoryMap	; show the memory map
+
+	xor	a
 	ret
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+str_Working:
+	.asciz	"Working.."
+
+str_Done:
+	.asciz	"..Done!\r\n"
 
 ; CopyROMToRAM
 ;	copies $0000 thru $2000 to itself
@@ -391,6 +478,9 @@ ShowSysInfo:
 ;	the ROM and writing to the RAM
 ;	Not sure if this is useful, but it's a good test.
 CopyROMToRAM:
+	ld	hl, #str_Working
+	call	Print
+
 	xor	a
 	ld	h, a
 	ld	l, a	; HL = $0000
@@ -411,14 +501,19 @@ CR2Ra:
 	ld	(hl), a		; change the opcode to  "ld a, #0x01"
 	
 	; we're done. return
+	ld	hl, #str_Done
+	call	Print
+	xor	a
 	ret
 
 
 ; DisableROM
 ;	set the ROM disable flag
 DisableROM:
+	
 	ld	a, #01
 	out	(RomDisable), a
+	xor	a
 	ret
 
 
@@ -427,6 +522,7 @@ DisableROM:
 EnableROM:
 	xor	a
 	out	(RomDisable), a
+	xor	a
 	ret
 
 
@@ -451,9 +547,9 @@ DoBootIotest:
 DoBoot:
 	ld	hl, #cmd_bootfile
 DoBootB:
-	rst	#0x20		; send to SD command
+	call	SendSDCommand
 	ld	hl, #cmd_bootread
-	rst	#0x20		; send to SD command
+	call	SendSDCommand
 
 
 	;;;;;;;;;;;;;;;;;;;;	
@@ -465,6 +561,8 @@ DoBootB:
 	jr	nz, bootloop	; make sure we have something loaded
 	ld	hl, #str_nofile	; print out an error message
 	call	Print
+
+	xor	a
 	ret
 	
 
@@ -496,20 +594,24 @@ LoadDone:
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-str_hello:
+str_filetest:
 	.asciz 	"~Ftest.txt\n"
 
 catFile:
-	ld	hl, #str_hello	; select file
-	rst	#0x20		; send to SD command
+	ld	hl, #str_filetest; select file
+	call	SendSDCommand
 	ld	hl, #cmd_bootread ; open for read
-	rst	#0x20		; send to SD command
+	call	SendSDCommand
+
+catSDPort:
+	ld	hl, #str_line
+	call	Print
 
 CF0:
 	; check for more bytes
 	in	a, (SDStatus)
 	and	#DataReady	; more bytes to read?
-	ret	z 		; nope. exit out
+	jr	z, CFRet 	; nope. exit out
 	
 	; load a byte from the file, print it out
 	in	a, (SDData)	; get the file data byte
@@ -517,7 +619,24 @@ CF0:
 	;ld	(hl), a		; store it out
 	inc	hl		; next position
 	jr	CF0		; repeat
+
+CFRet:
+	ld	hl, #str_line
+	call	Print
+
+	xor	a
+	ret
 	
+
+
+directoryList:
+	ld	hl, #cmd_dirpath
+	call	SendSDCommand
+
+	ld	hl, #cmd_directory
+	call	SendSDCommand
+	jr	catSDPort	; pretend it's a cat'd file!
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Text strings
@@ -569,6 +688,15 @@ str_loaded:
 
 str_nofile:
 	.asciz	"Couldn't load specified rom.\n\r"
+
+str_line:
+	.asciz	"--------------\n\r"
+
+cmd_dirpath:
+	.asciz	"~DROMs\n"
+
+cmd_directory:
+	.asciz	"~L\n"
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

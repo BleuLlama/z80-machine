@@ -24,8 +24,9 @@ MemRegion mems[] =
 {
     /* 0x1000 = 4kbytes */
     { 0x0000, (8 * 1024), REGION_RO, REGION_ACTIVE, NULL, "ROMs/lloader.rom" },
-    { 0x0000, (32 * 1024), REGION_RW, REGION_ACTIVE, NULL, NULL },
+//    { 0x0000, (32 * 1024), REGION_RW, REGION_ACTIVE, NULL, NULL },
     { 0x8000, (32 * 1024), REGION_RW, REGION_ACTIVE, NULL, NULL },
+
     REGION_END
 };
 

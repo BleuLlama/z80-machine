@@ -36,13 +36,13 @@ EM0:
 	;call	PrintNL
 
 	cp	#'q
-	ret	z
+	jr	z, EMExit	; quit 
 	
 	cp	#' 
-	jr	z, EM_next
+	jr	z, EM_next	; next chunk
 
 	cp	#'x
-	jr	z, EM_addr
+	jr	z, EM_addr	; enter address
 
 	cp	#0x0d
 	jr	z, EM0
@@ -51,6 +51,9 @@ EM0:
 
 	jp	ExaMem		; not valid, try again
 
+EMExit:
+	xor	a
+	ret
 
 
 ;;;;;;;;;;;;;;;;;;;;

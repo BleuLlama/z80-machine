@@ -32,11 +32,13 @@ PokeMemory:
 	pop	hl
 	ld	(hl), b
 
+	xor	a
 	ret
 
 	; if there was a problem, just return
 PM_nlret:
 	pop	de			; fix the stack
 	call	PrintNL
+	xor	a
 	ret
 

@@ -19,6 +19,7 @@
  *
  * ~*$      Enter command mode
  * ~L*$     Get directory listing (Catalog)
+ * ~Dname$  Directory "name"
  * ~Fname$  Filename "name"
  * ~R       Open selected file for read (will be streamed in)
  * Status byte will respond if there's more data to be read in
@@ -26,20 +27,22 @@
 
 
 /* modes for the state machine... */
-#define kMassMode_Idle      (0)
+#define kMassMode_Idle		(0)
 
-#define kMassMode_Command   (1)
+#define kMassMode_Command	(1)
 
-#define kMassMode_Dir       (2)
+#define kMassMode_DirPath	(2)
+#define kMassMode_Dir		(3)
 
-#define kMassMode_Filename  (3)
-#define kMassMode_ReadFile  (4)
+#define kMassMode_Filename	(4)
+#define kMassMode_ReadFile	(5)
 
 /* we'll handle file writing later */ 
 
 static int mode_Mass = kMassMode_Idle;
 static FILE * MassStorage_fp = NULL;
 static char filename[ 256 ];
+static char dirpath[ 256 ];
 static char dirbuffer[ 1024 ];
 static int fnPos = 0;
 static int moreToRead = 0;
@@ -52,6 +55,7 @@ void MassStorage_Init( void )
 	mode_Mass = kMassMode_Idle;
 	MassStorage_fp = NULL;
 	filename[0] = '\0';
+	dirpath[0] = '\0';
 	fnPos = 0;
 	moreToRead = 0;
 	dirbuffer[0] = '\0';
@@ -64,6 +68,7 @@ void MassStorage_Init( void )
 byte MassStorage_RX( void )
 {
 	int ch;
+
 	switch( mode_Mass ) {
 	case( kMassMode_Dir ):
 		/* get next byte of directory listing */
@@ -113,29 +118,62 @@ void MassStorage_TX( byte ch )
 		/* do nothing... */
 	}
 
+	if( mode_Mass == kMassMode_ReadFile ) {
+		/* do nothing... */
+	}
+
 	else if( mode_Mass == kMassMode_Filename ) {
 		/* store the filename until \r \n \0 or filled */
 		if(    ch == 0x0a 
 		    || ch == 0x0d
 		    || ch == 0x00
 		    || fnPos > 31 ) {
+			printf( "EMU: SD: Filename (%s)\n\r", filename );
 			mode_Mass = kMassMode_Idle;
-			printf( "EMU: SD: Filename %s\n\r", filename );
 		} else {
 			filename[fnPos++] = ch;
 		}
-		
+	}
+	else if( mode_Mass == kMassMode_DirPath ) {
+		/* store the filename until \r \n \0 or filled */
+		if(    ch == 0x0a 
+		    || ch == 0x0d
+		    || ch == 0x00
+		    || fnPos > 31 ) {
+			printf( "EMU: SD: DirPath (%s)\n\r", dirpath );
+			mode_Mass = kMassMode_Idle;
+		} else {
+			dirpath[fnPos++] = ch;
+		}
 	}
 
 	else if( mode_Mass == kMassMode_Command ) {
 		switch( ch ) {
 		case( 'L' ):
+			printf( "EMU: List command (%s)\n", dirpath );
 			mode_Mass = kMassMode_Dir;
 			/* open directory for read... */
 			moreToRead = 0;
 			break;
 
+		case( 'D' ):
+			printf( "EMU: Set dirpath\n" );
+			/* reset the dirpath position */
+			fnPos = 0;
+			/* clear the string */
+			do {
+				int j;
+				for( j=0 ; j<32 ; j++ ) {
+					dirpath[j] = '\0';
+				}
+				fnPos = 0;
+			} while ( 0 );
+
+			mode_Mass = kMassMode_DirPath;
+			break;
+
 		case( 'F' ):
+			printf( "EMU: Set Filename\n" );
 			/* reset the file name position */
 			fnPos = 0;
 			/* clear the string */
@@ -151,6 +189,7 @@ void MassStorage_TX( byte ch )
 			break;
 
 		case( 'R' ):
+			printf( "EMU: Read file (%s)\n", filename );
 			/* open file for read */
 			if( MassStorage_fp ) fclose( MassStorage_fp );
 			MassStorage_fp = fopen( filename, "rb" );
@@ -167,6 +206,7 @@ void MassStorage_TX( byte ch )
 			break;
 
 		default:
+			printf( "EMU: %c: unknown command\n", ch );
 			mode_Mass = kMassMode_Idle;
 		}
 	}
