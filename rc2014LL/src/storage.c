@@ -5,6 +5,9 @@
  *  2016-Jun-10  Scott Lawrence
  */
 
+#include <stdio.h>
+#include <sys/types.h>
+#include <dirent.h>
 #include "defs.h"
 #include "storage.h"
 #include "mc6850.h"
@@ -33,19 +36,22 @@
 
 #define kMassMode_DirPath	(2)
 #define kMassMode_Dir		(3)
+#define kMassMode_ReadDir	(4)
 
-#define kMassMode_Filename	(4)
-#define kMassMode_ReadFile	(5)
+#define kMassMode_Filename	(5)
+#define kMassMode_ReadFile	(6)
 
 /* we'll handle file writing later */ 
-
 static int mode_Mass = kMassMode_Idle;
 static FILE * MassStorage_fp = NULL;
 static char filename[ 256 ];
-static char dirpath[ 256 ];
-static char dirbuffer[ 1024 ];
 static int fnPos = 0;
 static int moreToRead = 0;
+
+static char dirpath[ 256 ];
+static DIR * dp;
+static struct dirent *ep;
+static char * dn;
 
 /* MassStorage_Init
  *   Initialize the SD simulator
@@ -58,7 +64,6 @@ void MassStorage_Init( void )
 	dirpath[0] = '\0';
 	fnPos = 0;
 	moreToRead = 0;
-	dirbuffer[0] = '\0';
 }
 
 /* MassStorage_RX
@@ -68,6 +73,7 @@ void MassStorage_Init( void )
 byte MassStorage_RX( void )
 {
 	int ch;
+	moreToRead = 0;
 
 	switch( mode_Mass ) {
 	case( kMassMode_Dir ):
@@ -95,6 +101,37 @@ byte MassStorage_RX( void )
 		mode_Mass = kMassMode_Idle;
 		moreToRead = 0;
 		return( 0x00 );
+		break;
+
+	case( kMassMode_ReadDir ):
+		/* read directory poll */
+		if( dp ) {
+			moreToRead = 1;
+			if( *dn == '\0' ) {
+				ep = readdir( dp );
+				if( !ep ) {
+					/* read directory done */
+					dn = NULL;
+					moreToRead = 0;
+					mode_Mass = kMassMode_Idle;
+					if( dp ) {
+						(void) closedir( dp );
+						dp = NULL;
+					}
+				} else {
+					dn = ep->d_name;
+					return( *dn );
+				}
+			} else {
+				/* ch = *dp */
+				dn++;
+				return( *dn );
+			}
+		} else {
+			moreToRead = 0;
+			mode_Mass = kMassMode_Idle;
+			return( 0x00 );
+		}
 		break;
 
 	case( kMassMode_Filename ):
@@ -151,9 +188,22 @@ void MassStorage_TX( byte ch )
 		switch( ch ) {
 		case( 'L' ):
 			printf( "EMU: List command (%s)\n", dirpath );
-			mode_Mass = kMassMode_Dir;
+
 			/* open directory for read... */
 			moreToRead = 0;
+			dn = NULL;
+
+			dp = opendir( dirpath );
+			if( dp != NULL )
+			{
+				ep = readdir( dp );
+				dn = ep->d_name;
+				mode_Mass = kMassMode_ReadDir;
+				moreToRead = 1;
+			} else {
+				mode_Mass = kMassMode_Idle;
+				moreToRead = 0;
+			}
 			break;
 
 		case( 'D' ):
@@ -216,11 +266,13 @@ void MassStorage_TX( byte ch )
 		mode_Mass = kMassMode_Command;
 	}
 
+	else if( ch == '\n' || ch == '\r' ) {
+
+	}
 	else {
 		/* unknown... just return to idle. */
 		mode_Mass = kMassMode_Idle;
 	}
-	
 }
 
 

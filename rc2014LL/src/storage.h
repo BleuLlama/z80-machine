@@ -10,11 +10,11 @@
 
 
 /* 0xDx = serial based Mass Storage */
-#define kMassPortControl	(0xD0)
-#define kMassPortStatus		(0xD0)
+#define kMassPortControl	(0xC0)
+#define kMassPortStatus		(0xC0)
 
-#define kMassPortRxData		(0xD1)
-#define kMassPortTxData		(0xD1)
+#define kMassPortRxData		(0xC1)
+#define kMassPortTxData		(0xC1)
 
 
 /* ********************************************************************** */
