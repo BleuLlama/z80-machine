@@ -1,8 +1,24 @@
 # RC2014 Architecture
 
+## Overview
+
+This is the 32k base model of the RC2014 computer from Spencer Owen, based
+on the Single Board Computer (SBC) from Grant Searle.  This version of 
+the emulation 
+
+ - 32 kbytes of RAM
+ - 8 kbytes of ROM
+ - ACIA serial terminal interface
+ - IO card support 
+ - Digital Input support (basic)
+ - Digital Output support (basic)
+
+Input and output card support does not display or read the value from
+anyplace other than itself.  See more details below.
+
 ## Memory
 
-    $0000 - $1FFF	8k BASIC ROM
+    $0000 - $1FFF	8k BASIC ROM (NASCOM 32k version)
     $2000 - $7FFF	(unused)
     $8000 - $FFFF	32k RAM
 
@@ -12,6 +28,7 @@
     $00 - (prototype SD bootloader card) (unavailable)
 
     $00 - Digital Input board (available soon)
+
     $01 - alternate for Digital Input Board
     $02 - alternate for Digital Input Board
     $03 - alternate for Digital Input Board
@@ -20,6 +37,7 @@
     $81 - Serial I/O Board (console) - MC68B50 ACIA Data
 
     $EE - Emulation detection (reports 0x41 'A') (See below)
+	  (Note: Not in real hardware, only emulation)
 
 
 ## Output Ports
@@ -64,3 +82,4 @@ emulation they refer to.
  - $FF - reserved / undefined
  - $41 - 'A' - RC2014 base hardware (this project)
  - $42 - 'B' - RC2014LL - Scott Lawrence's 64k ROM switchable system
+ - See other projects' README files in this repository for other values...
