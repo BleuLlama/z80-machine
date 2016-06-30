@@ -64,3 +64,57 @@ str_address:
 str_spaces:
 	.asciz	" "
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; Terminal app
+;  Opens the SD port, and sends stuff to and fro
+
+str_intro:
+	.ascii	"Terminal connection opening\n\r"
+	.asciz	"Hit backtick ` to end\n\r"
+
+str_outro:
+	.asciz	"\n\rTerminated connection\n\r"
+
+TerminalApp:
+	ld	hl, #str_intro
+	call	Print
+
+	; check for input from either port
+
+TA0:
+	in	a, (TermStatus)
+	and	#DataReady
+	call	z, TermToSD	; something outgoing... send it!
+
+	in	a, (SDStatus)
+	and	#DataReady
+	call	z, SDToTerm	; something incoming... get a byte
+
+	jr	TA0		; and repeat
+
+TermExit:
+	ld	hl, #str_outro
+	call	Print
+	ret
+
+TermToSD:
+	in	a, (TermData)	; get a byte from the terminal
+	push	af
+	call	printByte
+	call	PrintNL
+	pop	af
+	cp	#'`		; exit character
+	jr	z, TermExit	; yep! Exit!
+
+	out	(SDData), a	; send the byte out to the SD interface
+	ret
+
+SDToTerm:
+	in	a, (SDData)	; get a byte from the SD interface
+	push	af
+	call	printByte
+	call	PrintNL
+	pop	af
+	out	(TermData), a	; send the byte out to the terminal
+	ret

@@ -157,7 +157,8 @@ str_menu:
 	.ascii	"== Main ==\r\n"
 	.ascii	"  [B]oot options \r\n"
 	.ascii  "  [D]iagnostics\r\n"
-	.ascii	"  [M]em and [P]orts\r\n"
+	.ascii	"  [M]emory\r\n"
+	.ascii	"  [P]ort IO\r\n"
 .if( Emulation )
 	.ascii	"  [Q]uit emulator\r\n"	; should remove for burnable ROM
 .endif
@@ -355,6 +356,7 @@ str_menuP:
 	.ascii  "== Port IO ==\r\n"
 	.ascii  "  [I]nput from a port\r\n"
 	.ascii  "  [O]utput to a port\r\n"
+	.ascii  "  [T]erminal interface\r\n"
 	.ascii	"  [X]it this menu\r\n"
 	.byte	0x00
 
@@ -388,6 +390,9 @@ MP_prompt:
 
 	cp	#'O
 	call	z, OutPort
+
+	cp 	#'T
+	call	z, TerminalApp
 
 	jr	MP_prompt
 
@@ -615,10 +620,19 @@ CF0:
 	
 	; load a byte from the file, print it out
 	in	a, (SDData)	; get the file data byte
+	cp	#0x00		; received null...
+	call	z, CFNull	; nulls become newlines for dir listings
 	out	(TermData), a	; send it out.
 	;ld	(hl), a		; store it out
+
 	inc	hl		; next position
 	jr	CF0		; repeat
+
+CFNull:
+	push	hl
+	call	PrintNL
+	pop	hl
+	ret
 
 CFRet:
 	ld	hl, #str_line
