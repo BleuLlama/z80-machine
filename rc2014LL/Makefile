@@ -17,3 +17,9 @@ include ../Common/rules.mak
 $(BUILD)/m6850_xxx.o:	$(ORIGSRC)/defs.h $(COMMONSRC)/6850_xxx.c
 
 $(BUILD)/storage.o:	$(ORIGSRC)/defs.h $(SRC)/storage.c
+
+
+# additional content for 'all' target...
+all:
+	@echo Creating additional SD Card content...
+	-ln -s ../ROMs SD_DISK/
