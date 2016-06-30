@@ -123,6 +123,11 @@ additional tools:
       emulates RC2014 computer
     - This emulates the base RC2014, 32k RAM with 32K BASIC
 
+- rc2014LL/
+    - My extensions to the rc2014 computer
+    - 64k RAM, switchable ROM, SD card interface
+    - Arduino-based SD drive
+
 ## Build info
 
 First head into the "Z80asm" directory and type "make" to build the
