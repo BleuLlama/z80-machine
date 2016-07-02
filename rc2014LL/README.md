@@ -2,7 +2,7 @@
 
 ## Overview
 
-This is Scott's updated 64k version of the RC2014.  It's features are:
+This is Scott's updated 64k version of the RC2014.  Its features are:
 
  - 64 kbytes of RAM
  - 8 kbytes of ROM

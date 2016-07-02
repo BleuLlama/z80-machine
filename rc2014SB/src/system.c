@@ -1,6 +1,6 @@
 /* system.c
  *
- *  Emulation of the RC2014 system.
+ *  Emulation of the RC2014 system with Steve Barnett's bank switcher
  *
  *  This covers:
  *	- the general handler, poll routines
@@ -13,8 +13,8 @@
 #include <stdlib.h>		/* for exit() */
 #include "defs.h"		/* z80 emu system header */
 #include "utils.h"
+#include "ioports.h"		/* io port handling */
 #include "memregion.h"		/* memory region handling */
-#include "ioports.h"		/* io ports handling */
 #include "mc6850_console.h"	/* mc6850 emulation as console */
 
 
@@ -25,6 +25,7 @@ MemRegion mems[] =
 {
     /* 0x1000 = 4kbytes */
     { 0x0000, (8 * 1024), REGION_RO, REGION_ACTIVE, NULL, "ROMs/basic.32.rom" },
+    { 0x0000, (32 * 1024), REGION_RW, REGION_INACTIVE, NULL, NULL },
     { 0x8000, (32 * 1024), REGION_RW, REGION_ACTIVE, NULL, NULL },
     REGION_END
 };
@@ -37,7 +38,8 @@ MemRegion mems[] =
 void system_init( z80info * z80 )
 {
     /* Emulation info and credits */
-    printf( "Emulation of the RC2014 system\n" );
+    printf( "Emulation of the RC2014/SB system\n" );
+    printf( "  Bank Switching design by Stever Barnett\n" );
     printf( "  RC2014 by Spencer Owen\n" );
     printf( "  SBC by Grant Searle\n" );
     printf( "  Emu by Scott Lawrence\n" );
@@ -65,6 +67,7 @@ void system_poll( z80info * z80 )
 /* Port IO */
 
 
+
 byte HandleEmulationSignature( void ) { return 'A'; }
 
 
@@ -72,12 +75,6 @@ byte HandleEmulationSignature( void ) { return 'A'; }
 void io_output( z80info *z80, byte haddr, byte laddr, byte data )
 {
     ports_write( laddr, data );
-
-    if( laddr >= 0x00 && laddr <= 0x03 ) {
-	printf( ">> $%02x: ($%02x b"BYTE_TO_BINARY_PATTERN")"
-		  "\n", 
-		laddr, data, BYTE_TO_BINARY( data ) );
-    }
 }
 
 
@@ -89,11 +86,16 @@ void io_input(z80info *z80, byte haddr, byte laddr, byte *val )
     *val = ports_read( laddr );
 }
 
-
+void hitBankSwitcher( byte data )
+{
+    mems[0].active = REGION_INACTIVE; /* ROM */
+    mems[1].active = REGION_ACTIVE;   /* RAM B */
+}
 
 /* This gets called when the emulator starts to do any additional init */
 void io_init( z80info * z80 )
 {
+    int i;
     mc6850_console_init( z80 );
 
     /* set up the port io */
@@ -103,13 +105,11 @@ void io_init( z80info * z80 )
     writePorts[ 0x00 ] = HandlePortWrite00;
     readPorts[ 0x00 ] = HandlePortRead00;
 
-    /* Input and Output cards */
-    writePorts[ 0x01 ] = HandlePortWrite01;
-    writePorts[ 0x02 ] = HandlePortWrite02;
-    writePorts[ 0x03 ] = HandlePortWrite03;
-    readPorts[ 0x01 ] = HandlePortRead01;
-    readPorts[ 0x02 ] = HandlePortRead02;
-    readPorts[ 0x03 ] = HandlePortRead03;
+
+    for( i=0xf0 ; i<= 0xff ; i++ )
+    {
+	writePorts[ i ] = hitBankSwitcher;
+    }
 
     /* Serial IO card */
     writePorts[ kMC6850PortTxData ] = mc6850_out_console_data;
@@ -121,6 +121,7 @@ void io_init( z80info * z80 )
     writePorts[ 0xEE ] = HandleEmulationControl;
     readPorts[ 0xEE ] = HandleEmulationSignature;
 }
+
 
 
 /* ********************************************************************** */

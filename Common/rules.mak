@@ -30,7 +30,7 @@ $(BUILD)/%.o: $(SRC)/%.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 clean:
-	-rm -rf $(BIN)/ $(BUILD)/ mem
+	-rm -rf $(BIN)/ $(BUILD)/ ROMs
 
 .PHONY: $(TARG)
 

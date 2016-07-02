@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include "defs.h"		/* z80 emu system header */
 #include "memregion.h"		/* memory region handling */
+#include "ioports.h"		/* io ports handling */
 #include "storage.h"		/* SD card via serial port */
 #include "mc6850_console.h"	/* mc6850 emulation as console */
 
@@ -31,7 +32,7 @@ MemRegion mems[] =
 };
 
 
-void romen_update( byte val )
+void romen_update( const byte val )
 {
     if( val & 0x01 ) {
 	mems[0].active = REGION_INACTIVE;
@@ -80,62 +81,24 @@ void system_poll( z80info * z80 )
 /*  -DEXTERNAL_IO */
 /* Port IO */
 
-/* This gets called when the emulator starts to do any additional init */
-void io_init( z80info * z80 )
+
+/* digital IO simulation */
+void myHandlePortWrite00( const byte data )
 {
-    mc6850_console_init( z80 );
-    MassStorage_Init();
+    HandlePortWrite00( data );
+    romen_update( data );
+    regions_display( mems );
 }
 
 
-/* digital IO simulation */
-static byte digital_io0	= 0x00; /* used for ROM EN */
+byte HandleEmulationSignature( void ) { return 'B'; }
 
-static byte digital_io1	= 0x11;
-static byte digital_io2	= 0x22;
-static byte digital_io3	= 0x33;
-
+/* ********************************************************************** */
 
 /* Z80 "OUT" instruction calls this if EXTERNAL_IO is defined */
 void io_output( z80info *z80, byte haddr, byte laddr, byte data )
 {
-    int update_romen = 0;
-
-    switch( laddr ) {
-
-    /* simple simulation of digital I/o, output the data we got in */
-    case( 0x00 ): digital_io0 = data; update_romen = 1; break;
-
-    case( 0x01 ): digital_io1 = data; break;
-    case( 0x02 ): digital_io2 = data; break;
-    case( 0x03 ): digital_io3 = data; break;
-
-    /* console IO */
-    case( kMC6850PortTxData ):	mc6850_out_console_data( data ); 	break;
-    case( kMC6850PortControl ):	mc6850_out_console_control( data );	break;
-
-    /* Mass Storage */
-    case( kMassPortControl ): 	MassStorage_Control( data ); 	break;
-    case( kMassPortTxData ):	MassStorage_TX( data );		break;
-
-
-    /* emulator control */
-    case( 0xEE ): 
-	if( data == 0xF0 )
-	{
-		z_resetterm();
-		exit( 0 );
-	}
-	break;
-
-    default:
-	break;
-    }
-
-    if( update_romen ) {
-	romen_update( digital_io0 );
-	regions_display( mems );
-    }
+    ports_write( laddr, data );
 }
 
 
@@ -144,31 +107,40 @@ void io_input(z80info *z80, byte haddr, byte laddr, byte *val )
 {
     if( !val ) return;
 
-    /* set a default value of 0xff */
-    *val = 0xff;
+    *val = ports_read( laddr );
+}
 
-    switch( laddr ) {
 
-    /* simple simulation of digital I/o, output the data we got in */
-    case( 0x00 ): *val = digital_io0; break;
-    case( 0x01 ): *val = digital_io1; break;
-    case( 0x02 ): *val = digital_io2; break;
-    case( 0x03 ): *val = digital_io3; break;
+/* ********************************************************************** */
 
-    /* console IO */
-    case( kMC6850PortRxData ):	*val = mc6850_in_console_data(); 	break;
-    case( kMC6850PortStatus ):	*val = mc6850_in_console_status();	break;
+/* This gets called when the emulator starts to do any additional init */
+void io_init( z80info * z80 )
+{
+    mc6850_console_init( z80 );
+    MassStorage_Init();
 
-    /* Mass Storage */
-    case( kMassPortStatus ): 	*val = MassStorage_Status(); 	break;
-    case( kMassPortRxData ):	*val = MassStorage_RX();	break;
+    /* set up the port io */
+    ports_init();
 
-    /* emulator detection */
-    case( 0xEE ): *val = 'B';   break;
+    /* Digital IO card */
+    writePorts[ 0x00 ] = HandlePortWrite00;
+    readPorts[ 0x00 ] = HandlePortRead00;
 
-    default:
-	break;
-    }
+    /* Serial IO card */
+    writePorts[ kMC6850PortTxData ] = mc6850_out_console_data;
+    writePorts[ kMC6850PortControl ] = mc6850_out_console_control;
+    readPorts[ kMC6850PortRxData ] = mc6850_in_console_data;
+    readPorts[ kMC6850PortStatus ] = mc6850_in_console_status;
+
+    /* mass storage */
+    writePorts[ kMassPortControl ] = MassStorage_Control;
+    writePorts[ kMassPortTxData ] = MassStorage_TX;
+    readPorts[ kMassPortStatus ] = MassStorage_Status;
+    readPorts[ kMassPortRxData ] = MassStorage_RX;
+
+    /* emulator interface */
+    writePorts[ 0xEE ] = HandleEmulationControl;
+    readPorts[ 0xEE ] = HandleEmulationSignature;
 }
 
 

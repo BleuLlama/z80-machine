@@ -1,5 +1,6 @@
 # common build definitions
 
+TARG ?= rc2014_emu
 BUILD := ./build
 BIN := ./bin
 SRC := ./src
@@ -22,6 +23,7 @@ SRCS := \
 	$(ORIGSRC)/disassem.c \
 	$(ORIGSRC)/main.c \
 	$(COMMONSRC)/memregion.c \
+	$(COMMONSRC)/ioports.c \
 	$(COMMONSRC)/mc6850_console.c \
 	$(SRC)/system.c 
 

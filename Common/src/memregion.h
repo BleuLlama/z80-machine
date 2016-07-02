@@ -9,6 +9,8 @@
 #ifndef __MEMREGION_H__
 #define __MEMREGION_H__
 
+/* ********************************************************************** */
+
 typedef struct memRegion
 {
     long   addressStart;
@@ -38,6 +40,8 @@ MemRegion mems[] =
 };
 */
 
+/* ********************************************************************** */
+
 /* regions_init
  *
  *      load in ROMs, allocate memory, all that stuff
@@ -56,6 +60,7 @@ byte regions_read( MemRegion * m, word addr );
  */
 byte regions_write( MemRegion * m, word addr, byte val );
 
+/* ********************************************************************** */
 
 /* regions_display
  *
