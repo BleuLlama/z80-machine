@@ -54,7 +54,7 @@ void system_poll( z80info * z80 )
     /* NMI -> call 0x0066 */
     /* INTR -> call 0x0038 (IM1) */
 
-    if( z_kbhit() ) 
+    if( z_kbhit() && INTR == 0 && EVENT == FALSE ) 
     {
 	INTR = 1; /* for IM 1 support only */
 	EVENT = TRUE;
