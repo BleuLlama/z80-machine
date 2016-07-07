@@ -24,8 +24,10 @@
 MemRegion mems[] = 
 {
     /* 0x1000 = 4kbytes */
-    { 0x0000, (8 * 1024), REGION_RO, REGION_ACTIVE, NULL, "ROMs/lloader.rom" },
-//    { 0x0000, (32 * 1024), REGION_RW, REGION_ACTIVE, NULL, NULL },
+    { 0x0000, (32 * 1024), REGION_RO, REGION_ACTIVE, NULL, 
+		//"ROMs/lloader.rom" },
+		"ROMs/basic.32.rom" },
+    { 0x0000, (32 * 1024), REGION_RW, REGION_ACTIVE, NULL, NULL },
     { 0x8000, (32 * 1024), REGION_RW, REGION_ACTIVE, NULL, NULL },
 
     REGION_END
@@ -86,6 +88,7 @@ void system_poll( z80info * z80 )
 void myHandlePortWrite00( const byte data )
 {
     HandlePortWrite00( data );
+
     romen_update( data );
     regions_display( mems );
 }
@@ -123,7 +126,7 @@ void io_init( z80info * z80 )
     ports_init();
 
     /* Digital IO card */
-    writePorts[ 0x00 ] = HandlePortWrite00;
+    writePorts[ 0x00 ] = myHandlePortWrite00;
     readPorts[ 0x00 ] = HandlePortRead00;
 
     /* Serial IO card */
