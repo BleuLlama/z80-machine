@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <sys/types.h>
 #include <dirent.h>
+#include <string.h>
 #include "defs.h"
 #include "storage.h"
 #include "mc6850.h"
@@ -44,11 +45,13 @@
 /* we'll handle file writing later */ 
 static int mode_Mass = kMassMode_Idle;
 static FILE * MassStorage_fp = NULL;
-static char filename[ 256 ];
+#define kFilenameSz (256)
+static char filename[ kFilenameSz ];
 static int fnPos = 0;
 static int moreToRead = 0;
 
-static char dirpath[ 256 ];
+#define kDirpathSz (256)
+static char dirpath[ kDirpathSz ];
 static DIR * dp;
 static struct dirent *ep;
 static char * dn;
@@ -80,7 +83,6 @@ byte MassStorage_RX( void )
 		/* get next byte of directory listing */
 		/* dir listings are 0 terminated strings */
 		/* list itself is 0 terminated (send nulls at end) */
-
 
 		moreToRead = 0;
 		return( 0x00 );
@@ -213,7 +215,7 @@ void MassStorage_TX( byte ch )
 			/* clear the string */
 			do {
 				int j;
-				for( j=0 ; j<32 ; j++ ) {
+				for( j=0 ; j<kDirpathSz ; j++ ) {
 					dirpath[j] = '\0';
 				}
 				fnPos = 0;
@@ -229,10 +231,11 @@ void MassStorage_TX( byte ch )
 			/* clear the string */
 			do {
 				int j;
-				for( j=0 ; j<32 ; j++ ) {
+				for( j=0 ; j<kFilenameSz ; j++ ) {
 					filename[j] = '\0';
 				}
-				fnPos = 0;
+				strcat( filename, "SD_DISK/" );
+				fnPos = 8;
 			} while ( 0 );
 
 			mode_Mass = kMassMode_Filename;
