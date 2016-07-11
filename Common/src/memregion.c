@@ -11,6 +11,7 @@
 #include "defs.h"
 #include "memregion.h"
 
+
 /* regions_display
  *
  * 	display the rom regions 
@@ -49,6 +50,7 @@ void regions_init( MemRegion * m, byte * z80mem )
 {
     int region = 0;
     FILE * fp;
+
     if( !m ) return;
 
     if( z80mem ) {
