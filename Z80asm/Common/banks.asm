@@ -1,5 +1,5 @@
 	.module Banks
-CopyLoc = 0xfff0	; make sure there's enoguh space for the routine
+CopyLoc = 0xff00	; make sure there's enoguh space for the routine
 
         ;;;;;;;;;;;;;;;;;;;;
 	;  SwitchInRamRom
@@ -8,7 +8,7 @@ CopyLoc = 0xfff0	; make sure there's enoguh space for the routine
         ;       so we need to pre-can some content
 
 SwitchInRamRom:
-        ld      hl, #0xff00    ; this is where we put the stub
+        ld      hl, #CopyLoc    ; this is where we put the stub
         ld      de, #swapOutRom ; copy from
         ld      b, #endSwapOutRom-swapOutRom    ; copy n bytes
 
@@ -28,6 +28,9 @@ swapOutRom:
         out     (RomDisable), a ; runtime bank sel
 	jp	0x00000		; cold boot
 endSwapOutRom:
+
+
+
 
 
 SwitchToRom:
