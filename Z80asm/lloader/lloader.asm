@@ -426,6 +426,12 @@ MB_prompt:
 	cp	#'?
 	jp	z, MenuBoot
 
+	cp	#'3		; '3' - basic32.rom
+	call	z, DoBootBasic32
+
+	cp	#'5		; '5' - basic56.rom
+	call	z, DoBootBasic56
+
 	call	ToUpper
 
 	cp	#'X
@@ -433,12 +439,6 @@ MB_prompt:
 
 	cp	#'B		; 'B' - Boot.
 	call 	z, DoBoot
-
-	cp	#'3		; '0' - basic32.rom
-	call	z, DoBootBasic32
-
-	cp	#'5		; '1' - basic56.rom
-	call	z, DoBootBasic56
 
 	cp	#'i		; '2' - iotest.rom
 	call	z, DoBootIotest
@@ -515,7 +515,6 @@ CR2Ra:
 ; DisableROM
 ;	set the ROM disable flag
 DisableROM:
-	
 	ld	a, #01
 	out	(RomDisable), a
 	xor	a
@@ -535,6 +534,7 @@ EnableROM:
 
 	;;;;;;;;;;;;;;;
 	; boot roms
+
 DoBootBasic32:
 	ld	hl, #cmd_bootBasic32
 	jr	DoBootB	
@@ -595,7 +595,36 @@ LoadDone:
 
 	;;;;;;;;;;;;;;;;;;;;
 	; 7. Swap the ROM out
-	jp	SwitchInRamRom
+CopyLoc = 0xfff0        ; make sure there's enough space for the routine
+
+        ;;;;;;;;;;;;;;;;;;;;
+        ;  SwitchInRamRom
+        ;       the problem is that we need to bank switch,
+        ;       but once we do, this rom goes away.
+        ;       so we need to pre-can some content
+
+SwitchInRamRom:
+        ld      hl, #CopyLoc    ; this is where we put the stub
+        ld      de, #swapOutRom ; copy from
+        ld      b, #endSwapOutRom-swapOutRom    ; copy n bytes
+
+LDCopyLoop:
+        ld      a, (de)
+        ld      (hl), a
+        inc     hl
+        inc     de
+        djnz    LDCopyLoop      ; repeat 8 times
+
+        jp      CopyLoc         ; and run it!
+        halt                    ; code should never get here
+
+        ; this stub is here, but it gets copied to CopyLoc
+swapOutRom:
+        ld      a, #01          ; disable rom
+        out     (RomDisable), a ; runtime bank sel
+        jp      0x00000         ; cold boot
+endSwapOutRom:
+
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -656,6 +685,7 @@ directoryList:
 ; Text strings
 
 ; Version history
+;   v006 2016-07-07 - SD load and boot working again
 ;   v005 2016-06-16 - New menus?
 ;   v004 2016-06-11 - Hex dump of memory, in, out, poke
 ;   v003            - more options
@@ -664,9 +694,8 @@ directoryList:
 
 str_splash:
 	.ascii	"Lloader Shell for RC2014-LL\r\n"
-	.ascii	"  v005 2016-June-16  Scott Lawrence\r\n"
+	.ascii	"  v006 2016-July-07  Scott Lawrence\r\n"
 	.asciz  "\r\n"
-
 	
 str_help:
 	.ascii	"\r\n"
@@ -676,8 +705,6 @@ str_help:
 	;ascii  "  H for hexdump\r\n"
 	;ascii  "  0-9 for 0.rom, 9.rom\r\n"
 	.byte 	0x00
-
-
 
 cmd_bootfile:
 	.asciz	"~FROMs/boot.rom\n"
@@ -714,6 +741,7 @@ cmd_directory:
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; functionality includes
 
 .include "memprobe.asm"
 .include "examine.asm"
@@ -723,6 +751,3 @@ cmd_directory:
 .include "print.asm"
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; utility includes
-
-.include "../Common/banks.asm"
