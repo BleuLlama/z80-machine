@@ -16,8 +16,8 @@ TermData	= 0x81	; Data on MC6850 for terminal comms
   DataReady	= 0x01  ;  this is the only bit emulation works with.
 
 ;;;;;;;;;;;;;;;;;;;;
-SDStatus	= 0xD0	; Status on MC6850 for SD comms
-SDData		= 0xD1	; Data on MC6850 for SD comms
+SDStatus	= 0xC0	; Status on MC6850 for SD comms
+SDData		= 0xC1	; Data on MC6850 for SD comms
 	; SD Commands: (newline delimited)
 	;  ~L		Get directory listing
 	;  ~Fname	Set operations name (file or directory)
