@@ -27,12 +27,9 @@ ExaMem:
 	ld	hl, #str_exa_prompt
 	call	Print
 EM0:
-	in	a, (TermStatus)	; ready to read a byte?
-	and	#DataReady	; see if a byte is available
-	jr	z, EM0	; nope. try again
+	call	GetCh		; get terminal character
 
-	in	a, (TermData)
-	;out	(TermData), a	; echo
+	;call	PutCh		; echo
 	;call	PrintNL
 
 	cp	#'q
@@ -105,10 +102,8 @@ EB_Loop:
 	jp	ExaMem		; done! return to the shell
 
 xx:
-	push	hl
 	ld	a, #'.
-	out	(TermData), a
-	pop	hl
+	call	PutCh
 	ret
 
 ;;;;;;;;;;;;;;;;;;;;
@@ -168,7 +163,7 @@ EL_Pr00:
 
 	; space in the middle
 	ld	a, #' 
-        out     (TermData), a   ; send it out
+	call	PutCh
 
 	ld	b, #8
 EL_Pr01:

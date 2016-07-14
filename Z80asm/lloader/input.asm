@@ -15,13 +15,9 @@
 GetNibbleFromUser:
 	xor	a		; reset our return flag
 	ld	b, #0x00	; nibble entered by user
+	
 GNFU_0:
-	in	a, (TermStatus)	; ready to read a byte?
-	and	#DataReady	; see if a byte is available
-	jr	z, GNFU_0	; nope. try again
-
-	in	a, (TermData)	; get the character from the console
-
+	call	GetCh		; 
 
 	cp	#0x0a
 	jr	z, GNFU_Break	; return hit

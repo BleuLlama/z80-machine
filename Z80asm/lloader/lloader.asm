@@ -119,7 +119,7 @@ ToUpper:
 	and	#0xDF		; make uppercase (mostly)
 	ret
 
-EchoA:
+PutCh:
 	out	(TermData), a	; echo
 	ret
 
@@ -177,7 +177,7 @@ MM_prompt:
 	call	Print
 
 	call	GetCh		; get user input
-	call	EchoA		; echo it out
+	call	PutCh		; echo it out
 	call	PrintNL
 
 	; handle the passed in byte...
@@ -239,7 +239,7 @@ MD_prompt:
 	call	Print
 
 	call	GetCh
-	call	EchoA
+	call	PutCh
 	call	PrintNL
 
 	cp	#'?
@@ -289,7 +289,7 @@ MF_prompt:
 	call	Print
 
 	call	GetCh
-	call	EchoA
+	call	PutCh
 	call	PrintNL
 
 	cp	#'?
@@ -332,7 +332,7 @@ Mem_prompt:
 	call	Print
 
 	call	GetCh
-	call	EchoA
+	call	PutCh
 	call	PrintNL
 
 	cp	#'?
@@ -374,7 +374,7 @@ MP_prompt:
 	call	Print
 
 	call	GetCh
-	call	EchoA
+	call	PutCh
 	call	PrintNL
 
 	cp	#'?
@@ -420,7 +420,7 @@ MB_prompt:
 	call	Print
 
 	call	GetCh
-	call	EchoA
+	call	PutCh
 	call	PrintNL
 
 	cp	#'?
