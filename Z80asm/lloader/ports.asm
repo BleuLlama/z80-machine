@@ -83,8 +83,7 @@ TerminalApp:
 	; check for input from either port
 
 TA0:
-	in	a, (TermStatus)
-	and	#DataReady
+	call	KbHit
 	call	z, TermToSD	; something outgoing... send it!
 
 	in	a, (SDStatus)
@@ -99,7 +98,7 @@ TermExit:
 	ret
 
 TermToSD:
-	in	a, (TermData)	; get a byte from the terminal
+	call	GetCh
 	push	af
 	call	printByte
 	call	PrintNL
@@ -116,5 +115,5 @@ SDToTerm:
 	call	printByte
 	call	PrintNL
 	pop	af
-	out	(TermData), a	; send the byte out to the terminal
+	call	OutCh 		; send the byte out to the terminal
 	ret

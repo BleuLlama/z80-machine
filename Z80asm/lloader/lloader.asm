@@ -123,6 +123,10 @@ PutCh:
 	out	(TermData), a	; echo
 	ret
 
+KbHit:
+	in	a, (TermStatus)
+	and	#DataReady
+	ret
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 

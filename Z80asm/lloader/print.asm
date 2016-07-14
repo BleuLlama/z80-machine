@@ -20,7 +20,7 @@ printNibble:
 	jr	c, pn2
 	add	#'A - '0 - 10
 pn2:
-	out	(TermData), a	; send it out
+	call	OutCh
 	pop	af
 	ret
 
@@ -58,8 +58,8 @@ printHLnoX:
 
 	; add space
 	ld	a, #' 
-	out	(TermData), a	; send it out.
-	out	(TermData), a	; send it out.
+	call	OutCh
+	call	OutCh
 
 	pop	hl
 	ret
@@ -95,7 +95,7 @@ pao_0:
 	ld	a, #'.
 
 pao_1:
-        out     (TermData), a   ; send it out
+	call	OutCh
 
 	pop	hl
 	pop	af
