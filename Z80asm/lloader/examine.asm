@@ -121,6 +121,7 @@ Exa_Line:			; print out one line of memory
 	call	Print
 	pop	hl
 
+	; print out the HEX
 	push	hl		; store aside start address
 	ld	b, #16		; for 16 bytes...
 
@@ -148,6 +149,35 @@ EL_NoExtraSpace:
 
 	pop	hl		; restore start address
 
+	push	hl		; store it aside again
+
+	; print out asciiprintable
+
+EL_Prable:
+	push	hl
+	ld	hl, #str_spaces
+	call	Print
+	pop	hl
+	ld	b, #8
+
+EL_Pr00:
+	ld	a, (hl)
+	call	printASCIIok
+	inc	hl
+	djnz	EL_Pr00
+
+	; space in the middle
+	ld	a, #' 
+        out     (TermData), a   ; send it out
+
+	ld	b, #8
+EL_Pr01:
+	ld	a, (hl)
+	call	printASCIIok
+	inc	hl
+	djnz	EL_Pr01
+	
+	pop	hl		; restore start address
 	ld	de, #0x10
 	add	hl, de		; adjust HL for the new start location
 

@@ -78,3 +78,25 @@ printDE:
 	pop	hl
 	pop	af
 	ret
+
+
+; printASCIIok
+;	print out the printable character, or '.'
+printASCIIok:
+	push	af
+	push	hl
+
+	cp 	a, #' 
+	jr 	c, pao_0	; dot!
+
+	cp	a, #'~+1
+	jr	c, pao_1	; printable!
+pao_0:
+	ld	a, #'.
+
+pao_1:
+        out     (TermData), a   ; send it out
+
+	pop	hl
+	pop	af
+	ret
