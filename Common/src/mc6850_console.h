@@ -42,4 +42,33 @@ byte mc6850_in_console_data( void );
 /* read in the status byte from the ACIA */
 byte mc6850_in_console_status( void );
 
+
+/* ********************************************************************** */
+/* internal buffered versions */
+
+/* minimum time in milliseconds between keypresses */
+#define kThrottleMS	(10)
+/* number of keypresses to send out every duration timeout */
+#define kBurstCount	(5)
+/* size of the buffer */
+#define kRingBufSz 	(1024 * 8)
+
+/* as described in the above defines, the following use a 
+    pseudo-ring buffer of kRingBufSz bytes.  It will send out 
+    kBurstCount available bytes from the buffer every kThrottleMS 
+    milliseconds. 
+*/
+
+/* poll routine to be called from the system_poll() */
+void buffered_console_poll( void );
+
+/* is a byte available in the buffer? */
+int buffered_kbhit( void );
+
+/* get the data byte or 0xFF if none */
+byte mc6850_in_buffered_console_data( void );
+
+/* get the status */
+byte mc6850_in_buffered_console_status( void );
+
 #endif

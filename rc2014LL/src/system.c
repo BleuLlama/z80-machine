@@ -72,7 +72,9 @@ void system_poll( z80info * z80 )
     /* NMI -> call 0x0066 */
     /* INTR -> call 0x0038 (IM1) */
 
-    if( z_kbhit() ) 
+    buffered_console_poll();
+
+    if( buffered_kbhit() ) 
     {
 	INTR = 1; /* for IM 1 support only */
 	EVENT = TRUE;
@@ -132,8 +134,8 @@ void io_init( z80info * z80 )
     /* Serial IO card */
     writePorts[ kMC6850PortTxData ] = mc6850_out_console_data;
     writePorts[ kMC6850PortControl ] = mc6850_out_console_control;
-    readPorts[ kMC6850PortRxData ] = mc6850_in_console_data;
-    readPorts[ kMC6850PortStatus ] = mc6850_in_console_status;
+    readPorts[ kMC6850PortRxData ] = mc6850_in_buffered_console_data;
+    readPorts[ kMC6850PortStatus ] = mc6850_in_buffered_console_status;
 
     /* mass storage */
     writePorts[ kMassPortControl ] = MassStorage_Control;
