@@ -11,7 +11,7 @@
 #include <string.h>
 #include "defs.h"
 #include "storage.h"
-#include "mc6850.h"
+#include "rc2014.h"	/* common rc2014 emulator headers */
 
 
 /* ********************************************************************** */

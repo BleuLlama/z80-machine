@@ -9,13 +9,11 @@
  */
 
 #include <stdio.h>
-#include <string.h>		/* for memset(), memcpy() etc */
+#include <string.h>	/* for memset(), memcpy() etc */
 #include <stdlib.h>
-#include "defs.h"		/* z80 emu system header */
-#include "memregion.h"		/* memory region handling */
-#include "ioports.h"		/* io ports handling */
-#include "storage.h"		/* SD card via serial port */
-#include "mc6850_console.h"	/* mc6850 emulation as console */
+#include "defs.h"	/* z80 emu system header */
+#include "rc2014.h"	/* common rc2014 emulator headers */
+#include "storage.h"	/* SD card via serial port */
 
 
 /* ********************************************************************** */
@@ -52,6 +50,7 @@ void system_init( z80info * z80 )
 {
     /* Emulation info and credits */
     printf( "Emulation of the RC2014-LL system\n" );
+    printf( "    version %s\n", RC2014_VERSION );
     printf( "  RC2014 by Spencer Owen\n" );
     printf( "  Emu and LL extensions by Scott Lawrence\n" );
     printf( "  SBC by Grant Searle\n" );

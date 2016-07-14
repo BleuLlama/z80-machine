@@ -9,13 +9,10 @@
  */
 
 #include <stdio.h>
-#include <string.h>		/* for memset(), memcpy() etc */
-#include <stdlib.h>		/* for exit() */
-#include "defs.h"		/* z80 emu system header */
-#include "utils.h"
-#include "ioports.h"		/* io port handling */
-#include "memregion.h"		/* memory region handling */
-#include "mc6850_console.h"	/* mc6850 emulation as console */
+#include <string.h>	/* for memset(), memcpy() etc */
+#include <stdlib.h>	/* for exit() */
+#include "defs.h"	/* z80 emu system header */
+#include "rc2014.h"	/* common rc2014 emulator headers */
 
 
 /* ********************************************************************** */
@@ -39,6 +36,7 @@ void system_init( z80info * z80 )
 {
     /* Emulation info and credits */
     printf( "Emulation of the RC2014/SB system\n" );
+    printf( "    version %s\n", RC2014_VERSION );
     printf( "  Bank Switching design by Stever Barnett\n" );
     printf( "  RC2014 by Spencer Owen\n" );
     printf( "  SBC by Grant Searle\n" );
