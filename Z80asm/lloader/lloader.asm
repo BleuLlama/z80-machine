@@ -1,5 +1,5 @@
 ; Lloader
-;          Core Rom Loader for RC2014-LL
+;          Core Rom Loader for RC2014-LL / MicroLlama 5000
 ;
 ;          2016-05-09 Scott Lawrence
 ;
@@ -150,23 +150,28 @@ ColdBoot:
 	call	Print
 
 	; and run the main menu
-	jr	MenuMain
+	jp	MenuMain
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 
 str_prompt:
 	.asciz  "LL> "
 
 str_menu:
-	.ascii	"== Main ==\r\n"
-	.ascii	"  [B]oot options \r\n"
-	.ascii  "  [D]iagnostics\r\n"
-	.ascii	"  [M]emory\r\n"
-	.ascii	"  [P]ort IO\r\n"
+	.ascii	"== Menu ==\r\n"
+	.ascii	"  [B] boot.rom\r\n"
+	.ascii	"  [3] basic.32.rom\r\n"
+	.ascii	"  [5] basic.56.rom\r\n"
+	.ascii  "\r\n"
+	.ascii	"  [A] applications\r\n"
+	.ascii	"  [F] files\r\n"
+	.ascii	"  [R] ROM\r\n"
+	.ascii	"  [D] debug\r\n"
 .if( Emulation )
-	.ascii	"  [Q]uit emulator\r\n"	; should remove for burnable ROM
+	.ascii	"  [Q] quit emulator\r\n"	; should remove for burnable ROM
 .endif
-	.ascii	"  [?] for menu\r\n"
+	.ascii	"  [?] print menu\r\n"
 	.byte	0x00
 
 	;;;;;;;;;;;;;;;;;;;;	
@@ -190,6 +195,13 @@ MM_prompt:
 	cp	#'?		; '?' - help
 	jp	z, MenuMain
 
+
+	cp	#'3
+	call	z, DoBootBasic32
+
+	cp	#'5
+	call	z, DoBootBasic56
+
 	call	ToUpper
 
 .if( Emulation )
@@ -198,16 +210,20 @@ MM_prompt:
 .endif
 
 	cp	#'B
-	call	z, MenuBoot
+	call 	z, DoBoot
+
+
+	cp	#'A
+	call	z, MenuApps
+
+	cp	#'F
+	call	z, MenuFiles
+
+	cp	#'R
+	call	z, MenuROM
 
 	cp	#'D
-	call	z, MenuDiags
-
-	cp	#'M
-	call	z, MenuMemory
-
-	cp	#'P
-	call	z, MenuPorts
+	call	z, MenuDebug
 
 	jr	MM_prompt
 
@@ -218,21 +234,19 @@ ClrARet:
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-str_menuD: ;Diag Menu
-	.ascii  "== Diagnostics ==\r\n"
-	.ascii	"  [S]ystem info\r\n"
-	;.ascii	"  [M]emory Test\r\n"
-	.ascii	"  [C]opy ROM to RAM\r\n"
-	.ascii	"  [D]isable ROM (64k RAM)\r\n"
-	.ascii	"  [E]nable ROM (56k RAM)\r\n"
-	.ascii	"  [F]ile SD tests\r\n"
-	.ascii	"  [X]it this menu\r\n"
+str_menuD: ;Debug Menu
+	.ascii  "== Debug ==\r\n"
+	.ascii	"  [E] examine memory\r\n"
+	.ascii	"  [P] poke memory\r\n"
+	.ascii  "  [I] in from port\r\n"
+	.ascii  "  [O] out to port\r\n"
+	.ascii	"  [X] exit this menu\r\n"
 	.byte	0x00
 
 str_MDprompt:
-	.asciz	"DIAG "
+	.asciz	"DBG "
 
-MenuDiags:
+MenuDebug:
 	ld	hl, #str_menuD
 	call	Print
 MD_prompt:
@@ -247,15 +261,64 @@ MD_prompt:
 	call	PrintNL
 
 	cp	#'?
-	jp	z, MenuDiags
+	jp	z, MenuDebug
 
 	call	ToUpper
 
 	cp	#'X
 	jp	z, ClrARet
 
-	cp	#'S		; 'S' - sysinfo
-	call 	z, ShowSysInfo
+	cp	#'E
+	call	z, ExaMem
+
+	cp	#'P
+	call	z, PokeMemory
+
+	cp	#'I
+	call	z, InPort
+
+	cp	#'O
+	call	z, OutPort
+
+	jr	MD_prompt
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+str_menuR: ; ROM menu
+	.ascii  "== ROM ==\r\n"
+	.ascii	"  [S] show RAM/ROM config\r\n"
+	.ascii	"  [C] copy ROM to RAM\r\n"
+	.ascii	"  [D] disable ROM\r\n"
+	.ascii	"  [E] enable ROM\r\n"
+	.ascii	"  [X] exit this menu\r\n"
+	.byte	0x00
+
+str_MRprompt:
+	.asciz	"ROM "
+
+MenuROM:
+	ld	hl, #str_menuR
+	call	Print
+MR_prompt:
+	call	PrintNL
+	ld	hl, #str_MRprompt
+	call	Print
+	ld	hl, #str_prompt
+	call	Print
+
+	call	GetCh
+	call	PutCh
+	call	PrintNL
+
+	cp	#'?
+	jp	z, MenuROM
+
+	call	ToUpper
+
+	cp	#'X
+	jp	z, ClrARet
+
+	cp	#'S
+	call 	z, ShowMemoryMap
 
 	cp	#'C
 	call	z, CopyROMToRAM
@@ -266,28 +329,27 @@ MD_prompt:
 	cp	#'E
 	call	z, EnableROM
 
-	cp	#'F 		; ??? maybe make a file menu
-	call	z, MenuFile
+	jr	MR_prompt
 
-	jr	MD_prompt
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-str_menuF: ; File menu
+
+str_menuF: 
 	.ascii  "== Files ==\r\n"
-	.ascii	"  [C]at test.txt\r\n"
-	.ascii	"  [D]irectory list\r\n"
-	.ascii	"  [X]it this menu\r\n"
+	.ascii  "  [D] directory listing\r\n"
+	.ascii  "  [R] SD:readme.txt\r\n"
+	.ascii	"  [X] exit this menu\r\n"
 	.byte	0x00
 
-str_MFprompt:
+str_FILEprompt:
 	.asciz	"FILE "
 
-MenuFile:
+MenuFiles:
 	ld	hl, #str_menuF
 	call	Print
 MF_prompt:
 	call	PrintNL
-	ld	hl, #str_MFprompt
+	ld	hl, #str_FILEprompt
 	call	Print
 	ld	hl, #str_prompt
 	call	Print
@@ -297,82 +359,37 @@ MF_prompt:
 	call	PrintNL
 
 	cp	#'?
-	jp	z, MenuFile
+	jp	z, MenuFiles
 
 	call	ToUpper
 
 	cp	#'X
 	jp	z, ClrARet
-
-	cp	#'C
-	call	z, catFile
 
 	cp	#'D
 	call	z, directoryList
 
+	cp	#'R
+	call	z, catFile
+
 	jr	MF_prompt
 
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-str_menuM: ;mem and ports
-	.ascii  "== Memory ==\r\n"
-	.ascii  "  [E]xamine memory\r\n"
-	.ascii  "  [P]oke memory\r\n"
-	.ascii	"  [X]it this menu\r\n"
+str_menuA:
+	.ascii  "== Applications ==\r\n"
+	.ascii  "  [T] terminal $C0\r\n"
+	.ascii	"  [X] exit this menu\r\n"
 	.byte	0x00
 
-str_MEMprompt:
-	.asciz	"MEM "
-
-MenuMemory:
-	ld	hl, #str_menuM
-	call	Print
-Mem_prompt:
-	call	PrintNL
-	ld	hl, #str_MEMprompt
-	call	Print
-	ld	hl, #str_prompt
-	call	Print
-
-	call	GetCh
-	call	PutCh
-	call	PrintNL
-
-	cp	#'?
-	jp	z, MenuMemory
-
-	call	ToUpper
-
-	cp	#'X
-	jp	z, ClrARet
-
-	cp	#'E		; examine memory (hex dump)
-	call	z, ExaMem
-
-	cp	#'P
-	call	z, PokeMemory
-
-	jr	Mem_prompt
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-str_menuP:
-	.ascii  "== Port IO ==\r\n"
-	.ascii  "  [I]nput from a port\r\n"
-	.ascii  "  [O]utput to a port\r\n"
-	.ascii  "  [T]erminal interface\r\n"
-	.ascii	"  [X]it this menu\r\n"
-	.byte	0x00
-
-str_MPprompt:
+str_Aprompt:
 	.asciz	"PORT "
 
-MenuPorts:
-	ld	hl, #str_menuP
+MenuApps:
+	ld	hl, #str_menuA
 	call	Print
-MP_prompt:
+MA_prompt:
 	call	PrintNL
-	ld	hl, #str_MPprompt
+	ld	hl, #str_Aprompt
 	call	Print
 	ld	hl, #str_prompt
 	call	Print
@@ -382,72 +399,17 @@ MP_prompt:
 	call	PrintNL
 
 	cp	#'?
-	jp	z, MenuPorts
+	jp	z, MenuApps
 
 	call	ToUpper
 
 	cp	#'X
 	jp	z, ClrARet	; exit. return
 
-	cp	#'I
-	call	z, InPort
-
-	cp	#'O
-	call	z, OutPort
-
 	cp 	#'T
 	call	z, TerminalApp
 
-	jr	MP_prompt
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-str_menuB: ;boot options
-	.ascii  "== Boot ==\r\n"
-	.ascii	"  [B]oot\r\n"
-	.ascii	"  [3]2k basic.32.rom\r\n"
-	.ascii	"  [5]6k basic.56.rom\r\n"
-	.ascii	"  [X]it this menu\r\n"
-	.byte	0x00
-
-str_BOprompt:
-	.asciz	"BOOT "
-
-MenuBoot:
-	ld	hl, #str_menuB
-	call	Print
-MB_prompt:
-	call	PrintNL
-	ld	hl, #str_BOprompt
-	call	Print
-	ld	hl, #str_prompt
-	call	Print
-
-	call	GetCh
-	call	PutCh
-	call	PrintNL
-
-	cp	#'?
-	jp	z, MenuBoot
-
-	cp	#'3		; '3' - basic32.rom
-	call	z, DoBootBasic32
-
-	cp	#'5		; '5' - basic56.rom
-	call	z, DoBootBasic56
-
-	call	ToUpper
-
-	cp	#'X
-	jp	z, ClrARet
-
-	cp	#'B		; 'B' - Boot.
-	call 	z, DoBoot
-
-	cp	#'i		; '2' - iotest.rom
-	call	z, DoBootIotest
-
-	jr	MB_prompt
+	jr	MA_prompt
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -467,10 +429,9 @@ ShowSysInfo:
 	ld	hl, #str_splash
 	call	Print
 
-	call	ShowMemoryMap	; show the memory map
-
 	xor	a
 	ret
+
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -545,10 +506,6 @@ DoBootBasic32:
 
 DoBootBasic56:
 	ld	hl, #cmd_bootBasic56
-	jr	DoBootB	
-
-DoBootIotest:
-	ld	hl, #cmd_bootIotest
 	jr	DoBootB	
 
 	;;;;;;;;;;;;;;;;;;;;	
@@ -626,17 +583,17 @@ LDCopyLoop:
 swapOutRom:
         ld      a, #01          ; disable rom
         out     (RomDisable), a ; runtime bank sel
-        jp      0x00000         ; cold boot
+        jp      0x0000          ; cold boot
 endSwapOutRom:
 
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-str_filetest:
-	.asciz 	"~Ftest.txt\n"
+str_filereadme:
+	.asciz 	"~Freadme.txt\n"
 
 catFile:
-	ld	hl, #str_filetest; select file
+	ld	hl, #str_filereadme; select file
 	call	SendSDCommand
 	ld	hl, #cmd_bootread ; open for read
 	call	SendSDCommand
@@ -689,6 +646,7 @@ directoryList:
 ; Text strings
 
 ; Version history
+;   v007 2016-07-14 - Menu rearrange, better Hexdump
 ;   v006 2016-07-07 - SD load and boot working again
 ;   v005 2016-06-16 - New menus?
 ;   v004 2016-06-11 - Hex dump of memory, in, out, poke
@@ -697,19 +655,10 @@ directoryList:
 ;   v001 2016-05-09 - initial version, functional
 
 str_splash:
-	.ascii	"Lloader Shell for RC2014-LL\r\n"
-	.ascii	"  v006 2016-July-07  Scott Lawrence\r\n"
+	.ascii	"Lloader Shell for MicroLlama 5000\r\n"
+	.ascii	"  v007 2016-July-14  Scott Lawrence\r\n"
 	.asciz  "\r\n"
 	
-str_help:
-	.ascii	"\r\n"
-	.ascii  "==== ROM ====\r\n"
-
-	;ascii  "  C for catalog\r\n"
-	;ascii  "  H for hexdump\r\n"
-	;ascii  "  0-9 for 0.rom, 9.rom\r\n"
-	.byte 	0x00
-
 cmd_bootfile:
 	.asciz	"~FROMs/boot.rom\n"
 
@@ -718,9 +667,6 @@ cmd_bootBasic32:
 
 cmd_bootBasic56:
 	.asciz	"~FROMs/basic.56.rom\n"
-
-cmd_bootIotest:
-	.asciz	"~FROMs/iotest.rom\n"
 
 cmd_bootread:
 	.asciz	"~R\n"

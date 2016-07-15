@@ -92,6 +92,8 @@ memnext:
 	push	hl
 	jr	memloop
 
+	xor	a
+
 	ret
 
 

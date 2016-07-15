@@ -95,6 +95,7 @@ TA0:
 TermExit:
 	ld	hl, #str_outro
 	call	Print
+	xor	a
 	ret
 
 TermToSD:
@@ -115,5 +116,5 @@ SDToTerm:
 	call	printByte
 	call	PrintNL
 	pop	af
-	call	OutCh 		; send the byte out to the terminal
+	call	PutCh 		; send the byte out to the terminal
 	ret

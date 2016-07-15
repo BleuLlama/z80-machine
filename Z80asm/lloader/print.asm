@@ -20,7 +20,7 @@ printNibble:
 	jr	c, pn2
 	add	#'A - '0 - 10
 pn2:
-	call	OutCh
+	call	PutCh
 	pop	af
 	ret
 
@@ -58,8 +58,8 @@ printHLnoX:
 
 	; add space
 	ld	a, #' 
-	call	OutCh
-	call	OutCh
+	call	PutCh
+	call	PutCh
 
 	pop	hl
 	ret
@@ -95,7 +95,7 @@ pao_0:
 	ld	a, #'.
 
 pao_1:
-	call	OutCh
+	call	PutCh
 
 	pop	hl
 	pop	af
