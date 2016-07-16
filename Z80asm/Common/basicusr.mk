@@ -1,10 +1,11 @@
-# makefile to use Scott Lawrence's "Genroms" tool to build 
+#rom makefile to use Scott Lawrence's "Genroms" tool to build 
 # rom files from the intel hex file
 
 TARGROM := $(TARGBASE).rom
+TARGLST := $(TARGBASE).lst
 
 ROMSDIR := ../../ROMs
-ROMDEF  := ../Common/rc2014.roms
+ROMDEF  := ../Common/basicusr.roms
 
 GENFILES := \
 		$(TARGROM) \
@@ -15,23 +16,18 @@ GENFILES := \
 ################################################################################
 # build rules
 
-all: $(TARGROM) $(TARGBASE).hex $(ROMSDIR)
-	@echo "+ copy $(TARGROM) to ROMs directory"
-	@cp $(TARGROM) $(ROMSDIR)
-	@cp $(TARGBASE).hex $(ROMSDIR)
+all: $(TARGROM)
+	@echo "+ generate BASIC program from $(TARGLST)"
+	@../Common/basicusr.pl $(TARGLST)
 
 $(TARGROM): $(TARGBASE).ihx
 	@echo "+ genroms $<"
 	@genroms $(ROMDEF) $<
-	@mv rc2014.rom $@
+	@mv basicusr.rom $@
 
 $(ROMSDIR):
 	@echo "+ Creating roms directory"
 	@-mkdir $(ROMSDIR)
-
-%.hex: %.ihx
-	@echo "+ rename IHX as HEX"
-	@cp $< $@
 
 %.ihx: %.rel %.map
 	@echo "+ aslink $@"

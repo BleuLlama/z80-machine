@@ -1,6 +1,6 @@
 # program space
 begin program
-0x0000  0x2000  usr.rom	program_1
+0xf800  0x07FF  basicusr.rom	program_1
 end
 
 # graphics roms
