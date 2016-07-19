@@ -17,6 +17,9 @@
 
  Supprted commands:
 
+ ~Sx,v  - set value for X to V
+     x = 'w' => V = wait ms between characters
+     x = 'b' => V = number of characters to burstv (up to 16)
  ~Ffilename	- set the "filename"
  ~R		- read the file
  ~Ddirpath	- set the "dirpath"
@@ -28,16 +31,8 @@
 
 
 #include <SD.h>
-
-
-#define kPinLEDRed    (3)
-#define kPinLEDYellow (5)
-#define kPinLEDGreen  (6)
-
-#define kRed    (0x04)
-#define kYellow (0x02)
-#define kGreen  (0x01)
-#define kAll    (kRed | kYellow | kGreen)
+#include "LEDs.h"
+#include "BufferedSerial.h"
 
 #define kPinSDPresent (9) /* CD - Card detect */
 
@@ -48,80 +43,28 @@
 void(* resetFunc) (void) = 0;
 
 ////////////////////////////////////////////
-// Fancy LED control...
-
-int ledMask = 0;
-unsigned long ledTick = 0;
-int ledCount = 0;
-int ledSpeed = 0;
-
-/* poll the LED updater */
-void ledPoll( void )
-{
-  unsigned char aValue;  
-  if( millis() > ledTick ) {
-    ledCount++;
-    if( ledCount > 511 ) ledCount = 0;
-    ledTick = millis() + ledSpeed;
-
-    if( ledCount <= 256 ) aValue = ledCount;
-    else  aValue = 512 - ledCount;
-
-    aValue = 256 - aValue; /* reverse since they're sunk not sourced */
-
-    if( ledMask & kRed ) analogWrite( kPinLEDRed, aValue );
-    if( ledMask & kYellow ) analogWrite( kPinLEDYellow, aValue );
-    if( ledMask & kGreen ) analogWrite( kPinLEDGreen, aValue );
-    
-  }
-}
-
-/* delay for milliseconds, while polling the LEDs */
-void ledDelay( long ms )
-{
-  unsigned long endTime = millis() + ms;
-
-  while( millis() < endTime ) {
-    ledPoll();
-    serialPoll();
-  }
-}
-
-/* set the mask for the LED indicators */
-void ledSet( int mask, int spd )
-{
-  ledSpeed = spd;
-  
-  if( mask == ledMask ) return;
-  ledMask = mask;
-
-  /* turn them all off */
-  digitalWrite( kPinLEDGreen, HIGH );
-  digitalWrite( kPinLEDYellow, HIGH );
-  digitalWrite( kPinLEDRed, HIGH );
-
-  ledPoll();
-}
-
-////////////////////////////////////////////
 
 
 #define kSDSelectPin  (8)
+#define kSDAuxPin     (10) /* required */
 Sd2Card card;
 SdVolume volume;
-SdFile root;
+//SdFile root;
+
+class BufSerial ser;
 
 void initSD()
 {
-  pinMode(10, OUTPUT);      // required for SD
-  digitalWrite( 10, HIGH ); // needed too
+  pinMode( kSDAuxPin, OUTPUT);      // required for SD
+  digitalWrite( kSDAuxPin, HIGH ); // needed too
 
   if (!card.init(SPI_HALF_SPEED, kSDSelectPin)) {
-    Serial.write( "~ESD Init failed.\n" );
+    ser.write( "~E0=SD Init failed.\n" );
   } else {
-    Serial.write( "~NInitialization Complete.\n" );
+    ser.write( "~N0=Ready.\n" );
   }
 
+/*
   switch(card.type()) {
     case SD_CARD_TYPE_SD1:
       Serial.println("~NSD1");
@@ -135,35 +78,36 @@ void initSD()
     default:
       Serial.println("~NUnknown");
   }
-
+*/
   if (!volume.init(card)) {
-    Serial.println("~NCould not find FAT16/FAT32 partition.");
+    ser.println("~E0=No FAT partition");
     return;
   }
 
     // print the type and size of the first FAT-type volume
   uint32_t volumesize;
-  Serial.print("~NVolume type is FAT");
-  Serial.println(volume.fatType(), DEC);
-  Serial.println();
+  ser.print("~Nt=FAT");
+  ser.println(volume.fatType(), DEC);
+  ser.println();
 
-    volumesize = volume.blocksPerCluster();    // clusters are collections of blocks
+  volumesize = volume.blocksPerCluster();    // clusters are collections of blocks
   volumesize *= volume.clusterCount();       // we'll have a lot of clusters
   volumesize *= 512;                            // SD card blocks are always 512 bytes
-  Serial.print("~NVolume size (bytes): ");
-  Serial.println(volumesize);
-  Serial.print("~NVolume size (Kbytes): ");
+  ser.print("~Nsz=");
+//  ser.println(volumesize);
+//  ser.print("~NVolume size (Kbytes): ");
   volumesize /= 1024;
-  Serial.println(volumesize);
-  Serial.print("~NVolume size (Mbytes): ");
+//  ser.println(volumesize);
   volumesize /= 1024;
-  Serial.println(volumesize);
+  ser.print(volumesize);
+  ser.println(",meg");
 
-  Serial.println("\nFiles found on the card (name, date and size in bytes): ");
-  root.openRoot(volume);
+//  Serial.println("\nFiles found on the card (name, date and size in bytes): ");
+  //root.openRoot(volume);
   
   // list all files in the card with date and size
-  //root.ls(LS_R | LS_DATE | LS_SIZE);
+  //root.ls( LS_DATE | LS_SIZE);
+  //root.close();
 }
 
 
@@ -173,16 +117,11 @@ void initSD()
 void setup() {
   pinMode( kPinSDPresent, INPUT );
 
-  pinMode( kPinLEDRed, OUTPUT );
-  pinMode( kPinLEDYellow, OUTPUT );
-  pinMode( kPinLEDGreen, OUTPUT );
-
-  ledSet( kAll, 0 );
+  ledSetup();
+  detectCard(); // will reset the avr if failed
   
-  // initialize serial communications at 9600 bps:    
-  ledDelay( 100 );
-  ledSet( kGreen, 4 ); /* green, slow */
-  detectCard();
+  // it worked out.  start up serial...
+  serialInit();
 
   initSD();
 }
@@ -196,23 +135,20 @@ void serialInit()
   if( initialized ) return;
   initialized = 1;
   
-  Serial.begin( 115200 );
-  while( !Serial );
+  ser.begin( 115200 );
 }
 
 
 void serialPoll()
 {
-  if( !Serial ) return;
-  
-  if( Serial.available() ) {
-    char ch = Serial.read();
+  if( ser.available() ) {
+    char ch = ser.read();
 
     if( ch == 'r' ) { ledSet( kRed, 0 ); }
     if( ch == 'y' ) { ledSet( kYellow, 0 ); }
     if( ch == 'g' ) { ledSet( kGreen, 0 ); }
 
-    Serial.write( ch );
+    ser.write( ch );
   }
 }
 
@@ -231,17 +167,15 @@ void detectCard()
 
   // NO CARD
   if( !cardPresent ) {
-    ledSet( kRed, 0 ); /* red, fast */
-    ledDelay( 1000 );
+    ledEmoteError();
     resetFunc();
   }
-
-  serialInit();
 }
+
 
 void loop()
 {
-  detectCard();
-  ledPoll();
-  serialPoll();
+  detectCard(); // check to make sure we're still connected
+  ledPoll();    // update LED timers
+  serialPoll(); // check for input, and respond
 }

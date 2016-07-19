@@ -7,3 +7,4 @@ drives/A-Hdrive
 reference/
 notes.txt
 *.swp
+.DS_Store
