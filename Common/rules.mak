@@ -1,16 +1,26 @@
+######################################################################
 # Common build rules
 
 all: dirs $(BIN)/$(TARG)
 
+######################################################################
+
 dirs:
-	@-mkdir $(BUILD) 2>&1
-	@-mkdir $(BIN) 2>&1
-	@-ln -s ../ROMs
+	@echo Creating directories...
+	@-mkdir $(BUILD) 2>/dev/null || true
+	@-mkdir $(BIN) 2>/dev/null || true
+	@-ln -s ../ROMs 2>/dev/null || true
+
+######################################################################
 
 $(TARG): $(BIN)/$(TARG)
+.PHONY: $(TARG)
 
 $(BIN)/$(TARG): dirs $(OBJS)
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJS)
+	@echo Link $@
+	@$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJS)
+
+######################################################################
 
 $(BUILD)/z80.o:		$(ORIGSRC)/defs.h $(ORIGSRC)/z80.c
 $(BUILD)/disassem.o:	$(ORIGSRC)/defs.h $(ORIGSRC)/disassem.c
@@ -19,23 +29,32 @@ $(BUILD)/iomem.o:	$(ORIGSRC)/defs.h $(SRC)/iomem.c
 $(BUILD)/memregion.o:	$(ORIGSRC)/defs.h $(COMMONSRC)/memregion.c
 $(BUILD)/m6850_console.o:	$(ORIGSRC)/defs.h $(COMMONSRC)/6850_console.c
 
+######################################################################
 
 $(BUILD)/%.o: $(ORIGSRC)/%.c
-	$(CC) $(CFLAGS) -c -o $@ $<
+	@echo $@
+	@$(CC) $(CFLAGS) -c -o $@ $<
 
 $(BUILD)/%.o: $(COMMONSRC)/%.c
-	$(CC) $(CFLAGS) -c -o $@ $<
+	@echo $@
+	@$(CC) $(CFLAGS) -c -o $@ $<
 
 $(BUILD)/%.o: $(SRC)/%.c
-	$(CC) $(CFLAGS) -c -o $@ $<
+	@echo $@
+	@$(CC) $(CFLAGS) -c -o $@ $<
+
+######################################################################
 
 clean:
-	-rm -rf $(BIN)/ $(BUILD)/ ROMs
+	@echo Removing transient files...
+	@-rm -rf $(BIN)/ $(BUILD)/ ROMs
 
-.PHONY: $(TARG)
+.PHONY: clean
 
+######################################################################
 
 test: $(BIN)/$(TARG)
-	./$(BIN)/$(TARG)
+	@echo Testing $(TARG)
+	@./$(BIN)/$(TARG)
 
 .PHONY: test
