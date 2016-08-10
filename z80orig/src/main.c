@@ -215,7 +215,7 @@ command(z80info *z80)
 {
     char * retval;
     int retint;
-    int i, j, t, e;
+    unsigned int i, j, t, e;
     char str[256], *s;
     FILE *fp;
     static word pe = 0;
