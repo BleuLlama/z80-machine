@@ -2043,10 +2043,10 @@ init_z80info(z80info *z80)
 	z80->trace = FALSE;
 	z80->step = FALSE;
 	z80->sig = 0;
-	z80->syscall = FALSE;
 
 #ifdef BUILD_CPM
 	/* initialize the CP/M BIOS data */
+	z80->syscall = FALSE;
 	z80->drive = 0;
 	z80->dma = 0x80;
 	z80->track = 0;

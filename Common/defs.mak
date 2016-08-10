@@ -12,7 +12,10 @@ CFLAGS := -O2 -pipe -Wall -DPOSIX_TTY -DLITTLE_ENDIAN -DMEM_BREAK \
 	  -DEXTERNAL_IO -DEXTERNAL_MEM \
 	  -DSYSTEM_POLL \
 	  -Wall -pedantic \
-	  -Wno-pointer-sign -Wno-int-to-pointer-cast 
+	  -Wno-pointer-sign -Wno-int-to-pointer-cast \
+	  \
+	  -Wno-strict-aliasing \
+	  -std=c99 
 
 UNUSED_CFLAGS := -DAUTORUN -DRAW_TERM
 

@@ -16,6 +16,8 @@
 #include <string.h>
 #include <ctype.h>
 
+#include <sys/select.h>
+
 #include "defs.h"
 
 /* If external IO is to be included, we need these protos */
@@ -212,6 +214,7 @@ static void
 command(z80info *z80)
 {
     char * retval;
+    int retint;
     int i, j, t, e;
     char str[256], *s;
     FILE *fp;
@@ -302,9 +305,9 @@ loop:    /* "infinite" loop */
         break;
 
     case '!':                /* fork a shell */
-        system("exec ${SHELL:-/bin/sh}");
-        z_initterm();
-        printf("\n");
+	retint = system("exec ${SHELL:-/bin/sh}");
+	z_initterm();
+	printf( "\nExec returned with code %d\n", retint );
         break;
 
     case 'q':                /* quit */

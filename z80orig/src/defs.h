@@ -145,10 +145,10 @@ typedef struct z80info
     boolean trace;		/* trace mode off/on */
     boolean step;		/* step-trace mode off/on */
     int sig;		/* caught a signal */
+#ifdef BUILD_CPM
     int syscall;	/* CP/M syscall to be done */
     int biosfn;		/* BIOS function be done */
 
-#ifdef BUILD_CPM
     /* these are for the CP/M BIOS */
     int	drive;
     word dma;
