@@ -230,7 +230,7 @@ command(z80info *z80)
 loop:    /* "infinite" loop */
 
     /* prompt for a command from the user & then do it */
-    printf("Cmd: ");
+    printf("EMU: ");
     fflush(stdout);
     *str = '\0';
 
@@ -426,7 +426,7 @@ loop:    /* "infinite" loop */
 
         sscanf(str, "%x", &t);
 
-        if (t < 0 || t >= sizeof z80->mem)
+        if (/* t < 0 || */ t >= sizeof z80->mem)
         {
             printf("Cannot set breakpoint at addr 0x%X\n", t);
             break;
@@ -461,7 +461,7 @@ loop:    /* "infinite" loop */
 
         sscanf(str, "%x", &t);
 
-        if (t < 0 || t >= sizeof z80->mem)
+        if ( /* t < 0 || */  t >= sizeof z80->mem)
         {
             printf("    Cannot clear breakpoint at addr 0x%X\n", t);
             break;
