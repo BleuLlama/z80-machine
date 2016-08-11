@@ -54,6 +54,8 @@ implemented, this port will be at port address $03.
 ## Output Ports
 
     $00 - Digital IO output.  bit 0 disables ROM
+		xxxx xxx0  - ROM is enabled, RAM0000 disabled
+		xxxx xxx1  - ROM is disabled, RAM0000 enabled
 
     $80 - Serial I/O Board (console) - MC68B50 ACIA Control
     $81 - Serial I/O Board (console) - MC68B50 ACIA Data
@@ -85,15 +87,13 @@ Arduino host.
 
 ## SD Sector-based Content (Future)
 
-CP/M looks for disks in a directory named "SDISKS".  In there you
-should find up to 26 sub directories each named with the drive
-letter (eg "SDISKS/A/" "SDISKS/B" and so on.  From there, you can
-find a bunch of files named 0000.BIN 0001.BIN and so on.  These
-files contain the data for that sector of the disk.  They each
-contain 128 bytes of sector informaiton.  After that, they may
-contain other content in each file, but that is ignored by the CP/M
-bios routines.
+CP/M looks for disks in a directory named "SFDI" (Sector File Disk Images).  In
+there you should find up to 26 sub directories each named with the drive letter
+(eg "SFDI/A/" "SFDI/B" and so on.  From there, you can find a bunch of files 
+named 0000.BIN 0001.BIN and so on.  These files contain the data for that
+sector of the disk.  They each contain 128 bytes of sector informaiton.  After
+that, they may contain other content in each file, but that is ignored by the
+CP/M bios routines; only the first 128 bytes will be loaded in.
 
-For more information about this protocol, please refer to the
-subproject in the "Arduino" folder, where it is implemented for an
-Arduino host.
+For more information about this protocol, please refer to the subproject in
+the "Arduino" folder, where it is implemented for an Arduino host.

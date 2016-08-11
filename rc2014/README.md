@@ -27,11 +27,11 @@ anyplace other than itself.  See more details below.
 
     $00 - (prototype SD bootloader card) (unavailable)
 
-    $00 - Digital Input board (available soon)
+    $00 - Digital IO board (input buttons)
+    $00 - Digital Input board (available soon) (can also be on $01, $02, $03)
 
-    $01 - alternate for Digital Input Board
-    $02 - alternate for Digital Input Board
-    $03 - alternate for Digital Input Board
+    $01 - Joystick Input Board - Player 1 Joystick
+    $02 - Joystick Input Board - Player 2 Joystick
 
     $80 - Serial I/O Board (console) - MC68B50 ACIA Status
     $81 - Serial I/O Board (console) - MC68B50 ACIA Data
@@ -39,15 +39,23 @@ anyplace other than itself.  See more details below.
     $EE - Emulation detection (reports 0x41 'A') (See below)
 	  (Note: Not in real hardware, only emulation)
 
+For the Joystick board, the bits read are as follows:
+
+    $00 - No input
+    $01 - Up
+    $02 - Down
+    $04 - Left
+    $08 - Right
+    $10 - Fire 1
+    $20 - Fire 2
+
 
 ## Output Ports
 
     $00 - (prototype SD bootloader card) (unavailable)
 
-    $00 - Digital Output board (available soon)
-    $01 - alternate for Digital Output Board
-    $02 - alternate for Digital Output Board
-    $03 - alternate for Digital Output Board
+    $00 - Digital IO board (output LEDs)
+    $00 - Digital Output board (available soon) (can also be on $01, $02, $03)
 
     $80 - Serial I/O Board (console) - MC68B50 ACIA Control
     $81 - Serial I/O Board (console) - MC68B50 ACIA Data

@@ -8,12 +8,16 @@ yorgle@gmail.com
 
 This is the default SD contents for the RC2014/LL (MicroLlama 5000).
 
-This file may eventually contain more info.
-BASIC
-ROMs
-test.txt
+It contains some files:
 
-In short, there are a few directories that contain content:
+readme.txt
+	This file, contains this information you're reading now.
+
+test.txt
+	Just a test file for the ROM test routine in Lloader.
+
+
+There are also a few directories that contain content:
 
 BASIC/
 	.BAS text files containing program listings
@@ -25,9 +29,9 @@ ROMs/
 
 future:
 
-CPM/
-    CPM/A	Disk A sector file contents
-    CPM/B	Disk C sector file contents
-    CPM/C	Disk D sector file contents
+SFDI/
+    SFDI/A	Disk A sector file disk image contents
+    SFDI/B	Disk C sector file disk image contents
+    SFDI/C	Disk D sector file disk image contents
     ...
 

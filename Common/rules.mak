@@ -47,7 +47,7 @@ $(BUILD)/%.o: $(SRC)/%.c
 
 clean:
 	@echo Removing transient files...
-	@-rm -rf $(BIN)/ $(BUILD)/ ROMs
+	@-rm -rf $(BIN)/ $(BUILD)/ ROMs mem
 
 .PHONY: clean
 
