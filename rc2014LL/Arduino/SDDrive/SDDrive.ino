@@ -17,13 +17,14 @@
 
  Supprted commands:
 
- ~Sx,v  - set value for X to V
+ ~Sx,v  - set value for X to V (future)
      x = 'w' => V = wait ms between characters
      x = 'b' => V = number of characters to burstv (up to 16)
  ~Ffilename	- set the "filename"
  ~R		- read the file
  ~Ddirpath	- set the "dirpath"
  ~L		- directory listing as file
+ ~Gx,x,x - set geometry for data file
 
  ~Eerror text
  ~Nnotice text
@@ -138,6 +139,27 @@ void serialInit()
   ser.begin( 115200 );
 }
 
+
+
+/*
+
+New protocol idea:
+
+~V    version
+~C<pth> change directory
+~P      print directory
+~RB<file>  open for read binary
+~RA<file>  open for read ascii
+~WB<file>  open for write binary
+~WA<file>  open for write ascii
+~C          close file
+~~          send a tilde (for write ascii)
+~M<pth>     mkdir path
+
+ */
+
+#define kMaxBuf (128)
+char buf[ kMaxBuf ];
 
 void serialPoll()
 {

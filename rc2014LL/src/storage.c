@@ -7,6 +7,8 @@
 
 #include <stdio.h>
 #include <sys/types.h>
+#include <sys/stat.h>	/* for mkdir */
+#include <unistd.h>	/* for rmdir, unlink */
 #include <dirent.h>
 #include <string.h>
 #include "defs.h"
@@ -16,58 +18,143 @@
 
 /* ********************************************************************** */
 
-/* Serial interface to the Mass Storage 
- *
- * We'll define a simple protocol here...
- *  *$ means "ignore everything until end of line"
- *
- * ~*$      Enter command mode
- * ~L*$     Get directory listing (Catalog)
- * ~Dname$  Directory "name"
- * ~Fname$  Filename "name"
- * ~R       Open selected file for read (will be streamed in)
- * Status byte will respond if there's more data to be read in
+/*
+	New methodology (from the flowchart)
+
+	int shiftSendBit;  // 0x11 for two nibs to send, 0x00 for none
+	char sendByte;     // the byte we're sending now
+	int moreToSend;    // more content in the file (for chip emu)
+
+    start()
+	shiftSendBit = 0x00;
+	sendByte = '\0';
+	openFile();
+	moreToSend = 1;
+
+    done()
+	moreToSend = 0;
+	closeFile();
+
+    loop()
+	// check if we need to refill the sendByte
+	if( 0x00 == (shiftSendBit & 0x03) )
+	{
+	    if( !isNextSendByte() ) {
+		// no more bytes to send
+		sendByte = 'Z';
+		shiftSendBit = 0x03;
+			
+	    } else {
+		sendByte = getNextSendByte();
+		shiftSendBit = 0x03;
+	    }  
+	}
+
+	// send a nib
+	nib = 0x00;
+	if( shiftSendBit == 0x03 )
+	{
+	    nib = (sendByte >> 4) & 0x0F;
+	} else {
+	    // shiftSendBit is 0x01
+	    nib = sendByte & 0x0F;
+	}
+	sendOutByte( ValToHexscii( nib ));
+
+	// adjust our sentinel flags
+	shiftSendBit >>= 1;
+
+	// adjust moreToSend
+	if( sendByte == 'Z' && shiftSendBit == 0x00 ) {
+	    // we do not have more content
+	    moreToSend = 0;
+	} else {
+	    // we have more content
+	    moreToSend = 1;
+	}
  */
 
 
-/* modes for the state machine... */
-#define kMassMode_Idle		(0)
+/* Serial interface to the Mass Storage 
+ *
+ * Status byte will respond if there's more data to be read in
+ *
+ *  *$ means "ignore everything until end of line"
+ *  Commands should read the items they know and ignore until whitespace
+ *  or end of line as appropriate
+ *
+ *  <tilde><cmd><cmd opts (opt.)><space><args (opt.)><dollarSign><newline>
+ *  "~<cmd>$\n"
+ *  "~<cmd> <args>$\n"
+ *
+ * Directory
+ *   ~L path$		List directory (returned as an ascii file ~FR)
+ *			files are on lines by themselves.
+ *			lines alternate with <name>,<size>
+ *			directores are prepended with a /
+ *			directories file size is empty
+ *   ~M path$		Create directory (no response)
+ *
+ * Delete
+ *   ~D path$		Delete file or directory
+ *
+ * File Read
+ *   ~FR filename$	File Read as (2 bytes hex per byte of file)
+ *			characters used: 0-9,A-F (uppercase)
+ *			Newlines may be sent and should be ignored
+ *			Ends with ZZ
+ * File Write
+ *   ~FW filename$	File Write Ascii (as above)
+ *   ~FA filename$	File Append Ascii (as above, file is not overwritten)
+ *
+ *   ~FWH filename$	Write out as intel hex (as above)
+ *			File is sent as intel hex format
+ *			(Addresses preserved)
+ *
+ * Sector based file IO (future)
+ *   ~SR D S$		Read Drive "D" sector "S"
+ *   ~SW D S$		Write Drive "D" sectorn "S"
+ * 
+ */
 
-#define kMassMode_Command	(1)
+/* Meta State */
+#define kMS_ReadLine		(0) /* reading, idle */
+#define kMS_Writing		(1)
 
-#define kMassMode_DirPath	(2)
-#define kMassMode_Dir		(3)
-#define kMassMode_ReadDir	(4)
+static int metaState	= kMS_ReadLine;
+static int moreToRead	= 0;
 
-#define kMassMode_Filename	(5)
-#define kMassMode_ReadFile	(6)
 
-/* we'll handle file writing later */ 
-static int mode_Mass = kMassMode_Idle;
-static FILE * MassStorage_fp = NULL;
-#define kFilenameSz (256)
-static char filename[ kFilenameSz ];
-static int fnPos = 0;
-static int moreToRead = 0;
-
-#define kDirpathSz (256)
-static char dirpath[ kDirpathSz ];
-static DIR * dp;
-static struct dirent *ep;
-static char * dn;
+#define kMaxLine (255)
+static char lineBuf[kMaxLine];
 
 /* MassStorage_Init
  *   Initialize the SD simulator
  */
 void MassStorage_Init( void )
 {
-	mode_Mass = kMassMode_Idle;
-	MassStorage_fp = NULL;
-	filename[0] = '\0';
-	dirpath[0] = '\0';
-	fnPos = 0;
+	/* start out reading an input line... */
+	metaState = kMS_ReadLine;
+	lineBuf[0] = '\0';
 	moreToRead = 0;
 }
+
+
+static char val2ascii( int val )
+{
+	char *hexit = "0123456789ABCDEF";
+	val = val & 0x0F;
+	return hexit[val];
+}
+
+#define kBufSize (512)
+FILE * fp = NULL;
+char buffer[ kBufSize ];
+int nInBuf = 0;
+int nSent = 0;
+
+#define kReadBufSize (1024 * 1024);	/* 1 meg. why not */
+char readBuffer[ 64 * 1024 ];
 
 /* MassStorage_RX
  *   handle the simulation of the SD module sending stuff
@@ -75,75 +162,193 @@ void MassStorage_Init( void )
  */
 byte MassStorage_RX( void )
 {
-	int ch;
-	moreToRead = 0;
-
-	switch( mode_Mass ) {
-	case( kMassMode_Dir ):
-		/* get next byte of directory listing */
-		/* dir listings are 0 terminated strings */
-		/* list itself is 0 terminated (send nulls at end) */
-
-		moreToRead = 0;
-		return( 0x00 );
-		break;
-
-	case( kMassMode_ReadFile ):
-		if( MassStorage_fp ) {
-			if( fread( &ch, 1, 1, MassStorage_fp ) ) {
-				moreToRead = 1;
-				return ch;
-			} else {
-				/* end of file. close it */
-				fclose( MassStorage_fp );
-			}
-		}
-
-		/* no file open, send nulls. */
-		mode_Mass = kMassMode_Idle;
-		moreToRead = 0;
-		return( 0x00 );
-		break;
-
-	case( kMassMode_ReadDir ):
-		/* read directory poll */
-		if( dp ) {
-			moreToRead = 1;
-			if( *dn == '\0' ) {
-				ep = readdir( dp );
-				if( !ep ) {
-					/* read directory done */
-					dn = NULL;
-					moreToRead = 0;
-					mode_Mass = kMassMode_Idle;
-					if( dp ) {
-						(void) closedir( dp );
-						dp = NULL;
-					}
-				} else {
-					dn = ep->d_name;
-					return( *dn );
-				}
-			} else {
-				/* ch = *dp */
-				dn++;
-				return( *dn );
-			}
-		} else {
-			moreToRead = 0;
-			mode_Mass = kMassMode_Idle;
-			return( 0x00 );
-		}
-		break;
-
-	case( kMassMode_Filename ):
-	case( kMassMode_Command ):
-	case( kMassMode_Idle ):
-	default:
-		// content read requested during these is ignored
-		break;
-	}
 	return 0xff;
+}
+
+/* ********************************************************************** */
+
+#define kSD_Path 	"SD_DISK/"
+
+static void MassStorage_Start_Listing( char * path )
+{
+	printf( "EMU: SD: ls [%s]\n", path );
+}
+
+static void MassStorage_Do_MakeDir( char * path )
+{
+	char pathbuf[255];
+	sprintf( pathbuf, "%s%s", kSD_Path, path );
+
+	printf( "EMU: SD: mkdir [%s]\n", path ); 
+	printf( "         %s\n", pathbuf );
+	mkdir( pathbuf, 0755 );
+}
+
+static void MassStorage_Do_Remove( char * path )
+{
+	char pathbuf[255];
+	sprintf( pathbuf, "%s%s", kSD_Path, path );
+
+	printf( "EMU: SD: rm [%s]\n", path ); 
+
+	/* let's be stupid and just try to remove the file AND dir */
+	rmdir( pathbuf );
+	unlink( pathbuf );
+}
+
+
+static void MassStorage_Start_Read( char * path )
+{
+	char pathbuf[255];
+	sprintf( pathbuf, "%s%s", kSD_Path, path );
+
+	printf( "EMU: SD: Read from [%s]\n", path ); 
+
+	if( fp ) fclose( fp );
+
+	fp = fopen( pathbuf, "r" );
+	if( fp == NULL ) {
+		/* couldn't open file. */
+		printf( "EMU: SD: Can't open %s\n", pathbuf );
+		return;
+	}
+
+	nInBuf = 0;
+}
+
+
+static void MassStorage_Start_Write( char * path )
+{
+	printf( "EMU: SD: Write to [%s]\n", path ); 
+	printf( "EMU: SD: unavailable\n" );
+}
+
+static void MassStorage_Start_Append( char * path )
+{
+	printf( "EMU: SD: Append to [%s]\n", path ); 
+	printf( "EMU: SD: unavailable\n" );
+}
+
+
+static void MassStorage_Start_Sector_Read( char * args )
+{
+	printf( "EMU: SD: Read Sector [%s]\n", args ); 
+	printf( "EMU: SD: unavailable\n" );
+}
+
+static void MassStorage_Start_Sector_Write( char * args )
+{
+	printf( "EMU: SD: Write Sector [%s]\n", args ); 
+	printf( "EMU: SD: unavailable\n" );
+}
+
+static void MassStorage_End_File( void )
+{
+	printf( "EMU: SD: end file.\n" );
+	if( fp != NULL ) {
+		fclose( fp );
+		fp = NULL;
+		nInBuf = 0;
+	}
+}
+
+
+/* ********************************************************************** */
+
+/*
+    0123
+    ~I$		get system info
+    ~L path$	ls path
+    ~M path$	mkdir path
+    ~D path$	rm path
+
+    01234
+    ~FR path$	fopen( path, "r" );
+    ~FW path$	fopen( path, "w" );
+    ~FA path$	fopen( path, "a" ); fseek( 0, SEEK_END );
+    ~FW path$	(write as IHX) (future)
+
+    0123
+    ~SR D S$	read drive D sector S to buffer
+    ~SW D S$	write buffer to drive D sector S
+ */
+
+static void MassStorage_ParseLine( char * line )
+{
+	int error = 0;
+
+	printf( "EMU: SD: Parse Line: [%s]\n", lineBuf );
+	if( lineBuf[0] == 'Z' && lineBuf[1] == 'Z' && lineBuf[3] == '\0' ) {
+		/* close open write files. */
+		MassStorage_End_File();
+		return;
+	}
+	if( lineBuf[0] != '~' ) {
+		/* invalid */
+		error = 1;
+		return;
+	}
+
+	if( lineBuf[1] == 'I' && lineBuf[2] == '\0' )
+	{
+		printf( "EMU: Got ~I.  Should queue up info.\n" );
+	}
+
+	if(    lineBuf[2] == ' '
+	    && lineBuf[3] != '\0' )
+	{
+		switch( lineBuf[1] ) {
+		case( 'L' ):
+			MassStorage_Start_Listing( lineBuf+3 );
+			break;
+		case( 'M' ):
+			MassStorage_Do_MakeDir( lineBuf+3 );
+			break;
+		case( 'D' ):
+			MassStorage_Do_Remove( lineBuf+3 );
+			break;
+		default:
+			error = 2;
+		}
+	} else if(    lineBuf[3] == ' '
+		   && lineBuf[1] == 'S'
+		   && lineBuf[4] != '\0' )
+	{
+		/* Sector operations */
+		switch( lineBuf[2] ) {
+		case( 'R' ):
+			MassStorage_Start_Sector_Read( lineBuf+4 );
+			break;
+		case( 'W' ):
+			MassStorage_Start_Sector_Write( lineBuf+4 );
+			break;
+		}
+	} else if(    lineBuf[3] == ' '
+		   && lineBuf[1] == 'F'
+		   && lineBuf[4] != '\0' )
+	{
+		/* file operations */
+		switch( lineBuf[2] ) {
+		case( 'R' ):
+			MassStorage_Start_Read( lineBuf+4 );
+			break;
+		case( 'W' ):
+			MassStorage_Start_Write( lineBuf+4 );
+			break;
+		case( 'A' ):
+			MassStorage_Start_Append( lineBuf+4 );
+			break;
+		default:
+			error = 3;
+		}
+	}
+	else {
+		error = 4;
+	}
+
+	if( error != 0 ) {
+		printf( "EMU: SD: Error %d with [%s]\n", error, lineBuf );
+	}
 }
 
 
@@ -153,128 +358,20 @@ byte MassStorage_RX( void )
  */
 void MassStorage_TX( byte ch )
 {
-	if( mode_Mass == kMassMode_ReadFile ) {
-		/* do nothing... */
+	char lba[2] = { '\0', '\0' };
+
+	/* printf( "EMU: SD: read 0x%02x\n\r", ch ); */
+
+	if( ch == '\r' || ch == '\n' || ch == '\0' )
+	{
+		// end of string
+		MassStorage_ParseLine( lineBuf );
+		lineBuf[0] = '\0';
 	}
-
-	if( mode_Mass == kMassMode_ReadFile ) {
-		/* do nothing... */
-	}
-
-	else if( mode_Mass == kMassMode_Filename ) {
-		/* store the filename until \r \n \0 or filled */
-		if(    ch == 0x0a 
-		    || ch == 0x0d
-		    || ch == 0x00
-		    || fnPos > 31 ) {
-			printf( "EMU: SD: Filename (%s)\n\r", filename );
-			mode_Mass = kMassMode_Idle;
-		} else {
-			filename[fnPos++] = ch;
-		}
-	}
-	else if( mode_Mass == kMassMode_DirPath ) {
-		/* store the filename until \r \n \0 or filled */
-		if(    ch == 0x0a 
-		    || ch == 0x0d
-		    || ch == 0x00
-		    || fnPos > 31 ) {
-			printf( "EMU: SD: DirPath (%s)\n\r", dirpath );
-			mode_Mass = kMassMode_Idle;
-		} else {
-			dirpath[fnPos++] = ch;
-		}
-	}
-
-	else if( mode_Mass == kMassMode_Command ) {
-		switch( ch ) {
-		case( 'L' ):
-			printf( "EMU: List command (%s)\n", dirpath );
-
-			/* open directory for read... */
-			moreToRead = 0;
-			dn = NULL;
-
-			dp = opendir( dirpath );
-			if( dp != NULL )
-			{
-				ep = readdir( dp );
-				dn = ep->d_name;
-				mode_Mass = kMassMode_ReadDir;
-				moreToRead = 1;
-			} else {
-				mode_Mass = kMassMode_Idle;
-				moreToRead = 0;
-			}
-			break;
-
-		case( 'D' ):
-			printf( "EMU: Set dirpath\n" );
-			/* reset the dirpath position */
-			fnPos = 0;
-			/* clear the string */
-			do {
-				int j;
-				for( j=0 ; j<kDirpathSz ; j++ ) {
-					dirpath[j] = '\0';
-				}
-				fnPos = 0;
-			} while ( 0 );
-
-			mode_Mass = kMassMode_DirPath;
-			break;
-
-		case( 'F' ):
-			printf( "EMU: Set Filename\n" );
-			/* reset the file name position */
-			fnPos = 0;
-			/* clear the string */
-			do {
-				int j;
-				for( j=0 ; j<kFilenameSz ; j++ ) {
-					filename[j] = '\0';
-				}
-				strcat( filename, "SD_DISK/" );
-				fnPos = 8;
-			} while ( 0 );
-
-			mode_Mass = kMassMode_Filename;
-			break;
-
-		case( 'R' ):
-			printf( "EMU: Read file (%s)\n", filename );
-			/* open file for read */
-			if( MassStorage_fp ) fclose( MassStorage_fp );
-			MassStorage_fp = fopen( filename, "rb" );
-			if( MassStorage_fp ) {
-				
-				printf( "EMU: SD: Opened %s\n\r", filename );
-				moreToRead = 1;
-				mode_Mass = kMassMode_ReadFile;
-			} else {
-				printf( "EMU: SD: Failed %s\n\r", filename );
-				moreToRead = 0;
-				mode_Mass = kMassMode_Idle;
-			}
-			break;
-
-		default:
-			printf( "EMU: %c: unknown command\n", ch );
-			mode_Mass = kMassMode_Idle;
-		}
-	}
-
-	else if( ch == '~' ) {
-		/* enter command mode */
-		mode_Mass = kMassMode_Command;
-	}
-
-	else if( ch == '\n' || ch == '\r' ) {
-
-	}
-	else {
-		/* unknown... just return to idle. */
-		mode_Mass = kMassMode_Idle;
+	else if( strlen( lineBuf ) < (kMaxLine-1) )
+	{
+		lba[0] = ch;
+		strcat( lineBuf, lba );
 	}
 }
 
@@ -287,7 +384,7 @@ byte MassStorage_Status( void )
 	byte sts = 0x00;
 
 	if( moreToRead ) {
-		sts |= kPRS_RxDataReady; /* key is available to read */
+		sts |= kPRS_RxDataReady; /* data is available to read */
 	}
 
 	sts |= kPRS_TXDataEmpty;	/* we're always ready for new stuff */

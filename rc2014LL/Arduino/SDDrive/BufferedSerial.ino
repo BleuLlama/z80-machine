@@ -11,7 +11,7 @@
 
 BufSerial::BufSerial( void )
   : msDelay( 10 )
-  , burstCount( 3 )
+  , burstCount( 10 )
   , nSent( 0 )
 {
 }

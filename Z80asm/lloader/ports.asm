@@ -64,6 +64,7 @@ str_address:
 str_spaces:
 	.asciz	" "
 
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ; Terminal app
@@ -86,11 +87,15 @@ TA0:
 	call	KbHit
 	call	z, TermToSD	; something outgoing... send it!
 
+	cp	#'`		; if A is backtick, we can return
+	jr	z, TermExit	; we're done!
+
 	in	a, (SDStatus)
 	and	#DataReady
 	call	z, SDToTerm	; something incoming... get a byte
 
-	jr	TA0		; and repeat
+	jr	TA0
+
 
 TermExit:
 	ld	hl, #str_outro
@@ -100,21 +105,22 @@ TermExit:
 
 TermToSD:
 	call	GetCh
-	push	af
-	call	printByte
-	call	PrintNL
-	pop	af
-	cp	#'`		; exit character
-	jr	z, TermExit	; yep! Exit!
+	;push	af
+	;call	printByte
+	;call	PrintNL
+	;pop	af
+	;cp	#'`		; exit character
+	;jr	z, TermExit	; yep! Exit!
 
 	out	(SDData), a	; send the byte out to the SD interface
+	;ld	a, #0xFF
 	ret
 
 SDToTerm:
 	in	a, (SDData)	; get a byte from the SD interface
-	push	af
-	call	printByte
-	call	PrintNL
-	pop	af
+	;push	af
+	;call	printByte
+	;call	PrintNL
+	;pop	af
 	call	PutCh 		; send the byte out to the terminal
 	ret
