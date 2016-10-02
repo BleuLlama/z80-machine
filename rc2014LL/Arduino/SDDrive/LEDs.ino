@@ -6,11 +6,8 @@
  */
 
 #include "LEDs.h"
+#include "PinConfig.h"
 
- 
-#define kPinLEDRed    (3)
-#define kPinLEDYellow (5)
-#define kPinLEDGreen  (6)
 
 ////////////////////////////////////////////
 // Fancy LED control...

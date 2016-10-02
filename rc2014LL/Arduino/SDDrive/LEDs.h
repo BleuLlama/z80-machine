@@ -12,6 +12,7 @@
 #define kYellow (0x02)
 #define kGreen  (0x01)
 #define kAll    (kRed | kYellow | kGreen)
+#define kOff    (0)
 
 /* poll the LED updater */
 void ledPoll( void );

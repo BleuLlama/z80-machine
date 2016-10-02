@@ -3,112 +3,74 @@
  * 
  * Serial based interface for an SD card
  *
- *  v001  2016-06-27  yorgle@gmail.com
+ *  yorgle@gmail.com
  */
-
-
-/* Commands:
-
- All commands are newline terminated, and are in the form:
-
-	"~X\n"  or  "~XOpt\n"  or  "~XOpt,Opt,Opt\n"
-
- "Opt" are optional comma separated options.
-
- Supprted commands:
-
- ~Sx,v  - set value for X to V (future)
-     x = 'w' => V = wait ms between characters
-     x = 'b' => V = number of characters to burstv (up to 16)
- ~Ffilename	- set the "filename"
- ~R		- read the file
- ~Ddirpath	- set the "dirpath"
- ~L		- directory listing as file
- ~Gx,x,x - set geometry for data file
-
- ~Eerror text
- ~Nnotice text
-*/
 
 
 #include <SD.h>
 #include "LEDs.h"
 #include "BufferedSerial.h"
-
-#define kPinSDPresent (9) /* CD - Card detect */
-
-////////////////////////////////////////////
-// Utility...
-
-/* call this to reset the arduino */
-void(* resetFunc) (void) = 0;
+#include "PinConfig.h"
+#include "Strings.h"
 
 ////////////////////////////////////////////
-
-
-#define kSDSelectPin  (8)
-#define kSDAuxPin     (10) /* required */
-Sd2Card card;
-SdVolume volume;
-//SdFile root;
 
 class BufSerial ser;
+char echo = 1;
+
+////////////////////////////////////////////
+
+Sd2Card card;
+SdVolume volume;
+
+int errorSD = -1;
+
+////////////////////////////////////////////
 
 void initSD()
 {
-  pinMode( kSDAuxPin, OUTPUT);      // required for SD
-  digitalWrite( kSDAuxPin, HIGH ); // needed too
+  pinMode( kPinSDAux, OUTPUT);      // required for SD
+  digitalWrite( kPinSDAux, HIGH ); // needed too
 
-  if (!card.init(SPI_HALF_SPEED, kSDSelectPin)) {
-    ser.write( "~E0=SD Init failed.\n" );
+  errorSD = 0;
+
+  SD.begin( kPinSDSelect );
+  
+  if (!card.init(SPI_HALF_SPEED, kPinSDSelect)) {
+    errorSD = 1;
+  } 
+}
+
+
+void sendSDInfo()
+{  
+  if( errorSD == 1 ) {
+    ser.writeln( kStr_Error_InitFailed );
   } else {
-    ser.write( "~N0=Ready.\n" );
+    ser.writeln( kStr_CardOk );
   }
 
-/*
-  switch(card.type()) {
-    case SD_CARD_TYPE_SD1:
-      Serial.println("~NSD1");
-      break;
-    case SD_CARD_TYPE_SD2:
-      Serial.println("~NSD2");
-      break;
-    case SD_CARD_TYPE_SDHC:
-      Serial.println("~NSDHC");
-      break;
-    default:
-      Serial.println("~NUnknown");
-  }
-*/
   if (!volume.init(card)) {
-    ser.println("~E0=No FAT partition");
+    ser.println( kStr_Error_NoFatPartition );
     return;
   }
 
     // print the type and size of the first FAT-type volume
   uint32_t volumesize;
-  ser.print("~Nt=FAT");
+  ser.print( kStr_FAType );
   ser.println(volume.fatType(), DEC);
-  ser.println();
 
   volumesize = volume.blocksPerCluster();    // clusters are collections of blocks
   volumesize *= volume.clusterCount();       // we'll have a lot of clusters
   volumesize *= 512;                            // SD card blocks are always 512 bytes
-  ser.print("~Nsz=");
+  ser.print( kStr_Size );
 //  ser.println(volumesize);
 //  ser.print("~NVolume size (Kbytes): ");
   volumesize /= 1024;
 //  ser.println(volumesize);
   volumesize /= 1024;
-  ser.print(volumesize);
-  ser.println(",meg");
-
-//  Serial.println("\nFiles found on the card (name, date and size in bytes): ");
-  //root.openRoot(volume);
-  
-  // list all files in the card with date and size
-  //root.ls( LS_DATE | LS_SIZE);
-  //root.close();
+  ser.print( volumesize );
+  ser.println( kStr_SizeUnits );
 }
 
 
@@ -117,14 +79,15 @@ void initSD()
 
 void setup() {
   pinMode( kPinSDPresent, INPUT );
+  serialInit();
+  ser.println( );
+  ser.println( kStr_Version );
 
   ledSetup();
   detectCard(); // will reset the avr if failed
   
-  // it worked out.  start up serial...
-  serialInit();
-
   initSD();
+  sendSDInfo();
 }
 
 ////////////////////////////////////////////
@@ -140,61 +103,273 @@ void serialInit()
 }
 
 
-
-/*
-
-New protocol idea:
-
-~V    version
-~C<pth> change directory
-~P      print directory
-~RB<file>  open for read binary
-~RA<file>  open for read ascii
-~WB<file>  open for write binary
-~WA<file>  open for write ascii
-~C          close file
-~~          send a tilde (for write ascii)
-~M<pth>     mkdir path
-
- */
-
 #define kMaxBuf (128)
-char buf[ kMaxBuf ];
+char buf[ kMaxBuf ] = { '\0' };
 
-void serialPoll()
+////////////////////////////////////////////
+
+/* cheat sheet
+    0123
+    ~I$         get system info
+
+    ~PL path$   ls path
+    ~PM path$   mkdir path
+    ~PR path$   rm path
+
+    01234
+    ~FR path$   fopen( path, "r" );
+    ~FW path$   fopen( path, "w" );
+    ~FA path$   fopen( path, "a" ); fseek( 0, SEEK_END );
+    ~FWH path$  (write as IHX) (future)
+    ~FC$        fclose()
+
+    0123
+    ~SR D S$    read drive D sector S to buffer
+    ~SW D S$    write buffer to drive D sector S
+*/
+
+
+////////////////////////////////////////////
+
+void cmd_fail( void )
 {
-  if( ser.available() ) {
-    char ch = ser.read();
+  ser.println();
+  ser.println( kStr_Error_CmdFail );
+}
 
-    if( ch == 'r' ) { ledSet( kRed, 0 ); }
-    if( ch == 'y' ) { ledSet( kYellow, 0 ); }
-    if( ch == 'g' ) { ledSet( kGreen, 0 ); }
+void cmd_pass( void )
+{
+  ser.println();
+  ser.println( kStr_CmdOK );
+}
 
-    ser.write( ch );
+
+////////////////////////////////////////////
+// F-Commands
+//  File IO commands
+
+void processFCommands( const char * line )
+{
+  ser.write( "F Command: " );
+
+  ser.writeln( line );
+}
+
+////////////////////////////////////////////
+// P-Commands
+//  path-based stuff
+
+void do_ls( const char * line )
+{
+  File ppp;
+  int nFiles = 0;
+  
+  ser.writeln( kStr_Begin );
+
+  ppp = SD.open( line );
+  ppp.seek( 0 );
+  
+  while(true) { 
+    File entry =  ppp.openNextFile();
+    if ( !entry ) {
+      // no more files
+      entry.close(); // Added
+      break;
+    }
+    
+    ser.print( entry.name() );
+    if (entry.isDirectory()) {
+      ser.println("/");
+    } else {
+      // files have sizes, directories do not
+      ser.print(" , ");
+      unsigned long sz = entry.size();
+      ser.println( sz, DEC);
+      nFiles++;
+    }
+    entry.close(); // Added
+  }
+  ser.print( kStr_End );
+  ser.println( nFiles );
+  
+  ppp.close();
+}
+
+void do_mkdir( const char * line )
+{
+  if( !SD.mkdir( line ) ) {
+    cmd_fail();
+  } else {
+    cmd_pass();
+  }
+}
+
+void do_rm( const char * line )
+{
+  /* we'll play dumb here, first try to remove it as a file, then as a directory */
+  
+  if( !SD.remove( line ) ) {
+    if( !SD.rmdir( line ) ) {
+      cmd_fail();
+    } else {
+      cmd_pass();
+    }
+  } else {
+    cmd_pass();
+  }
+}
+
+
+//  Path/Directory commands
+void processPCommands( const char * line )
+{
+  // make sure there's a param
+  if( *(line+1) == '\0' || *(line+1) != ' ' || *(line+2) == '\0') {
+    // command ends with no param
+    ser.writeln( "PARAMERR" );
+    return;
+  }
+  
+  switch( *line ) {
+    case( 'L' ): do_ls( line+2 ); break;
+    case( 'M' ): do_mkdir( line+2 ); break;
+    case( 'R' ): do_rm( line+2 ); break;
+    default:
+      ser.write( "UNK ");
+      ser.writeln( line );
+      break;
   }
 }
 
 
 ////////////////////////////////////////////
-// Main program loop
+// S-Commands
+//  sector IO
 
+void processSCommands( const char * line )
+{
+  ser.println( kStr_Error_NotImplemented );
+}
+
+
+////////////////////////////////////////////
+// L-commands
+//  undocumented, set the board LEDs for debugging
+
+void processLCommands( const char * line )
+{
+  if( *line == 'r' ) { ledSet( kRed, 0 ); }
+  if( *line == 'y' ) { ledSet( kYellow, 0 ); }
+  if( *line == 'g' ) { ledSet( kGreen, 0 ); }
+  if( *line == '0' ) { ledSet( kOff, 0 ); }
+  if( *line == '1' ) { ledSet( kAll, 0 ); }
+}
+
+
+////////////////////////////////////////////
+
+void processLine( void )
+{
+  if( buf[0] == '\0' ) {
+    // absorb empty lines
+    buf[0] = '\0';
+    return;
+  }
+  
+  if( buf[0] != '~' ) {
+    // if there's no ~, it's a failure command
+    ser.writeln( kStr_Error_BadLine );
+    ser.write( kStr_Error_LEcho );
+    ser.writeln( buf );
+    buf[0] = '\0';
+    return;
+  }
+
+  // ok. let's hand off control to the appropriate processor
+  switch( buf[1] ) {
+    case( 'e' ):
+      // toggle echo
+      echo ^= 1;
+      break;
+      
+    case( 'I' ): sendSDInfo(); break;
+    
+    case( 'F' ): processFCommands( &buf[2] ); break;
+    case( 'P' ): processPCommands( &buf[2] ); break;
+    case( 'S' ): processSCommands( &buf[2] ); break;
+    case( 'L' ): processLCommands( &buf[2] ); break;
+    default:
+      break;
+  }
+
+  // and clear the line
+  buf[0] = '\0';
+}
+
+void serialPoll( void )
+{
+  size_t l;
+  
+  if( ser.available() ) {
+    char ch = ser.read();
+
+    if( echo ) {
+      if( ch == '\n' ) ser.println();
+      else ser.write( ch );
+    }
+
+    l = strlen( buf );
+    if( ch == '\n' || ch == '\r' || l >= (kMaxBuf-1) ) {
+      // process the line
+      processLine();
+      
+    } else if( l < kMaxBuf ) {
+      // add the character, and null-terminate
+      buf[ l ] = ch;
+      buf[ l+1 ] = '\0';
+    }
+  }  
+}
+
+
+////////////////////////////////////////////
+// Card detection and reset
+
+/* call this to reset the arduino */
+//void(* resetFunc) (void) = 0;
+
+void resetFunc() // Restarts program from beginning but does not reset the peripherals and registers
+{
+  asm volatile ("jmp 0");  
+} 
 
 void detectCard()
 {
   static int lastCardPresent = -1;
+  
   int cardPresent = digitalRead( kPinSDPresent );
   if( cardPresent == lastCardPresent ) return;
 
-  lastCardPresent = cardPresent;
-
   // NO CARD
   if( !cardPresent ) {
+    ser.println( kStr_Error_NoCard );
     ledEmoteError();
     resetFunc();
+  } else {
+    
+    // CARD OK.
+    if( lastCardPresent == -1 ) {
+      ledEmoteOk();
+    }
   }
+
+  // make sure we don't do things multiple times
+  lastCardPresent = cardPresent;
 }
 
 
+////////////////////////////////////////////
+// Main program loop
 void loop()
 {
   detectCard(); // check to make sure we're still connected

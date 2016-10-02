@@ -6,6 +6,7 @@
 #ifndef __BUFFEREDSERIAL_H__
 #define __BUFFEREDSERIAL_H__
 
+#define USE_SERIAL1
 
 class BufSerial {
 public:
@@ -33,11 +34,13 @@ public:
   // writing
   void write( char ch );
   void write( const char * ch );
+  void writeln( void ) { this->write( "\r\n" ); }
+  void writeln( const char * ch ) { this->write( ch ), this->writeln(); }
 
   // printing
   void print( const char * str ) { this->write( str ); }
   void print( long val, int type=DEC );
-  void println( void ) { this->print( "\n" ); }
+  void println( void ) { this->print( "\r\n" ); }
   void println( const char * str ) { this->print( str ); this->println(); }
   void println( long val, int type=DEC ) { this->print( val, type ); this->println(); }
 
