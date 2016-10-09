@@ -1,13 +1,21 @@
 
 /* Version info
  *  
+ *  v003 : 2016-10-
+ *  
+ *  v002 : 2016-10-07  yorgle@gmail.com
+ *         Internal
+ *  
  *  v001 : 2016-10-01  yorgle@gmail.com
+ *         Initial version, bascic structure, directory P commands
  */
 
-#define kStr_Version              "-N0=SSDD1,v001"
+#define kStr_Version              "-N0=SSDD1,v003"
 /* Version string is the following format:
  *  {header}={deviceID},{device's version number}
  *  SSDD1 = Serial SD Drive 1
+ *  
+ *  Future versions may have a drive letter between the '-' and the 'N' for example.
  */
 
 // Error responses
@@ -20,6 +28,11 @@
 #define kStr_Error_LEcho          "-E5="
 
 #define kStr_Error_CmdFail        "-E6=Failed"
+
+#define kStr_Error_NibbleCount    "-E7=Nibbles"
+#define kStr_Error_NoFileWrite    "-E8=No WR"
+#define kStr_Error_FileNotFound   "-E9=FNF"
+#define kStr_Error_FileNotWR      "-EA=FNWR"
 
 // Notification responses
 #define kStr_CardOk               "-N1=Card OK"

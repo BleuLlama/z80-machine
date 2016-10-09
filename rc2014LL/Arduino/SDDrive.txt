@@ -1,0 +1,332 @@
+----------------------------------------
+                                SSDD1 v1
+
+                         Serial SD Drive
+                                 2016-10
+
+                          Scott Lawrence
+                        yorgle@gmail.com
+
+
+----------------------------------------
+                                Overview
+
+The SSDD1 has been designed to be a serial-based mass storage device
+for the RC2014/LL computer.  It is meant to talk over a standard
+serial interface at 115200 baud.
+
+The initial implementation of this is via an Arduino Pro Micro,
+connected directly to a level-shifting SD card interface.  It has 
+three LEDs on the drive board, red, yellow, and gren, which can
+indicate various states of operation.
+
+
+----------------------------------------
+                                 Arduino
+
+The project has been built using Arduino 1.6.11 IDE.
+
+The Arduino's pin configuration is as follows:
+
+- D0 - Serial RX to the host computer
+- D1 - Serial TX to the host computer
+
+- D3 - Red LED - with a 2.2k resistor - to +5v
+- D5 - Amber LED - with a 2.2k resistor - to +5v
+- D6 - Green LED - with a 2.2k resistor - to +5v
+
+- D8 - SD card select
+- D9 - SD present switch
+- D10 - SD Card Select
+- D11 - SD MOSI
+- D12 - SD MISO
+- D13 - SD Clock
+
+
+----------------------------------------
+                                    LEDs
+
+The LED indicators mean as follows:
+
+- All off - device is off or resetting.
+- Fast red pulsing - no SD card is present
+- Slow green pulsing - SD card is present and is OK
+- Solid red - device has a file open for write
+- Solid amber - device has a file open for read
+
+
+----------------------------------------
+                                Protocol
+
+The SSDD1 talks on TTL level serial at 115200 baud, 8 bits, No
+parity, 1 stop bit.  (115200 8N1). 
+
+
+NOTE: Although it runs at such a fast baud rate, there is throttling
+      in the code such that it will not overload the host Z80
+      computer.  This can be removed for other applications.
+
+On startup, or device reset, it may send:
+
+    -N0=SDD1,v002
+    -E0=No card
+
+Notice (-Nx=) that it is SDD1 version 002
+Error (-Ex=)0: No card is inserted.
+
+Notices start with -N and errors start with -E.  After that, the
+next character is the error code.  Next is an equals sign, and then
+text, possibly comma separated, until a newline.
+
+Note that it may also send empty lines, that can be ignored.
+
+If you power it on with no card inserted, it will respond with the
+N0 notice as above, but also with Error code 0, as above.
+
+Once a card has been inserted, it may send something like:
+
+    -N0=SDD1,v002
+    -N1=Card OK
+    -Nt=FAT16
+    -Ns=952,meg
+
+It's pretty obvious what these responding fields mean.  See the
+Appendices below for more explanation of them
+
+
+------------------------------
+                      Commands
+
+Commands are sent from the host computer to the SSDD1.  They are
+sent as ASCII text, with the first character being a ~ and the last
+character being a newline.
+
+It is valid to send blank lines.  The commands are grouped by type
+and by letter.
+
+
+--------------------
+       Info commands
+
+~I
+	Respond with drive info.  Usually the notice sequence:
+	N0, N1, Nt, Ns
+
+	Example:
+
+	    ~I
+	    -N1=Card OK
+	    -Nt=FAT16
+	    -Ns=952,meg
+
+
+
+--------------------
+       Path commands
+
+~PL <path>
+	List the files in the specified path.  It will list all
+	files and directories in up to 8.3 format.
+
+	Responds with an "Nbf=" notice.  Then on consecutive lines,
+	it contains one file or directory name per line. It then
+	ends with a "Nef=" notice, where the content is the number
+	of files,subdirectories. 
+
+	Each line will contain the <SUBDIR>+"/" if the preceeding
+	path information is of a subdirectory.
+
+	Each line will contain the <FILENAME>,<number of bytes> if
+	the FILENAME is of a file.
+
+	Example:
+
+	    ~PL BASIC
+	    -Nbf=
+	    LLTEST.BAS,963
+	    USRTEST.BAS,4571
+	    -Nef=2
+
+	Similar to "dir" or "ls"
+
+
+~PM <path>
+	Create a subdirectory with the path specified. 
+
+	Example:
+	
+	    ~PM FOOBAR
+	    -N2=OK
+
+	Similar to "mkdir"
+
+
+~PR <path>
+	Delete a file or empty subdirectory.  If it cannot remove
+	the file or subdirectory, it responds with E6.
+
+	Example:
+
+	    ~PR FOOBAR
+	    -N2=OK
+
+	Similar to "rm", "rmdir", "del"
+
+
+--------------------
+       File commands
+
+Files are transferred over the wire in Asciified HEX values. The 
+data will be reconstructed on either end.  
+
+The content, as it passes over the wire, will be converted to Ascii
+Hex values.  The only valid content is the characters '0'-'9',
+'A'-'F'.  Newlines may be present on the transferred data and should
+be ignored.
+
+
+~FR <path>
+	Opens the file at <path> on the SD card for raw reading.
+
+	The file will be streamed from the SSDD1 to the host.  File
+	content will be between "Nbf" and "Nef" tags. 
+
+	Once the '-' character is encountered, it will be assumed
+	to be the end of the file, and a "Nef" tag will be next.
+
+	If the file cannot be found, "E9" will be returned.
+
+~FW <path>
+	Opens the file at <path> on the SD card for writing.  This
+	will erase the currently existing contents, if there are
+	any.  The file will remain open (and may not get flushed)
+	until the ~FC close command is sent.
+
+	If the file cannot be opened, "EA" will be returned.
+
+~FA <path>
+	Opens the file at <path> on the SD card for append.  Same
+	basic idea as FW.  If the file does not yet exist, then the
+	behavior is the same as FW.
+
+~FS <string to newline>
+	Send the string to be written to the SD card. It should be
+	in Asciified binary format. Only characters in the valid
+	range as explained above will be observed.  Each string sent
+	must contain an even number of valid characters.
+
+	OK:  129AB92AB110BD01
+	OK:  129 AB 92AB 110helloBD01
+	BAD: 129AB92AB110BD 1
+
+	If a bad string is sent, the device will ignore the last
+	nibble sent.  It will respond with "E7", and writing will 
+	resume. 
+
+	If no file is open, it will respond with "E8".
+
+~FC
+	Closes the currently open file for read or write.
+
+
+
+--------------------
+     Sector commands
+
+These commands are used to write and read from virtual drives.  They
+will operate on 128 byte sectors, to match CP/M.  The drive, track,
+sector specified are expected to be in the form:
+
+	 drive: 'A' - 'Z'
+	 track: '0000' - '9999'
+	sector: '0000' - '9999'
+
+However, due to implementation it can be any string in any of those
+three locations.  For this document, these three parameters will
+be referred to as simply "DTS".
+
+~SR <drive> <track> <sector>
+	Sector read from specified DTS.  The content transferred
+	will be in IHX format.
+
+~SW <drive> <track> <sector>
+	Sector write to specified DTS.  The content transferred
+	will be in IHX format.
+
+
+----------------------------------------
+                     Appendix A: Notices
+
+	N0	Notice of device ID and version
+	N1	Card functional/readable
+	Nt	Filesystem type (FATxx)
+	Ns	Drive size,units
+	Nbf	File content begins
+	Nef	File content ends
+
+----------------------------------------
+                      Appendix B: Errors
+ 
+
+	E0	No card is inserted or detected
+	E1	SD card initialization failed
+	E2	No FAT filesystem found
+	E3	General Error. "Nope"
+	E4	Line could not be read from host
+	E5	Echo of erroroneous data
+	E6	General Failure
+	E7	Bad ASCII nibble count
+	E8	No file open for write
+	E9	File not found
+	EA	File not writable
+
+
+----------------------------------------
+                  Appendix C: IHX Format
+
+The two types of IHX records supported in the SSDDS are:
+
+	00 - Data
+	01 - End Of File
+
+And their spec follows...
+
+<colon><number of bytes><start address><record type><data><checksum>
+
+The checksum is computed by summing each individual byte from the
+entire record between the colon and the checksum.  Then the twos
+compliment of the LSB of the sum is the checksum.
+
+For example, the data record:
+
+	:0300300002337A1E
+	:--____--======++
+
+Can be separated into fields:
+
+    - number of bytes of data: 0x03
+    - start address: 0x0030
+    - record type: 0x00  (Data)
+    - data (3 bytes as defined): 0x02, 0x33, 0x7A
+    - checksum: Comp2( 0x03 + 0x00 + 0x30 + ... + 0x33 + 0x7A) = 0x1E
+
+Here's an example End of File record:
+
+	:00000001FF
+	:--____--++
+
+Which should be identical to every end of file record. ;)
+
+    - number of bytes of data: 0x00 (no data bytes)
+    - start address: 0x0000 (no start address)
+    - record type: 0x01 (End of File record)
+    - checksum: Comp2( 0x00 + 0x00 + 0x00 + 0x01 ) = 0xFF
+
+
+----------------------------------------
+             Appendix D: Version History
+
+v003  2016-
+v002  2016-10-08 - Initial new version, P commands
+v001  2016-10-01 - Internal version, old xfer protocol
+

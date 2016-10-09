@@ -120,12 +120,12 @@ char buf[ kMaxBuf ] = { '\0' };
     ~FR path$   fopen( path, "r" );
     ~FW path$   fopen( path, "w" );
     ~FA path$   fopen( path, "a" ); fseek( 0, SEEK_END );
-    ~FWH path$  (write as IHX) (future)
+    ~FS ascii$  fwrite( asciiStringToBinary( ascii ));
     ~FC$        fclose()
 
     0123
-    ~SR D S$    read drive D sector S to buffer
-    ~SW D S$    write buffer to drive D sector S
+    ~SR D T S$    read drive D, track T, sector S to buffer
+    ~SW D T S$    write buffer to drive D, track T, sector S
 */
 
 
@@ -148,11 +148,89 @@ void cmd_pass( void )
 // F-Commands
 //  File IO commands
 
+
+void do_FileRead( const char * path )
+{
+  ser.print( "Open for read " );
+  ser.println( path );
+  
+  File myFile = SD.open( path );
+  if( !myFile ) {
+    cmd_fail();
+    return;
+  }
+
+  unsigned long sz = myFile.size();
+  ser.println( sz, DEC );
+
+  while( myFile.available() ) {
+    int ch = myFile.read();
+    
+    if( ch == '\n' || ch=='\r' ) ser.println();
+    else ser.write( ch );
+  }
+
+  cmd_pass();
+  myFile.close();
+}
+
 void processFCommands( const char * line )
 {
-  ser.write( "F Command: " );
+//  ser.write( "F Command: " );
+//  ser.writeln( line );
 
-  ser.writeln( line );
+  // for Close, there's just "~FC"
+  if( *(line) == 'C' ) {
+    cmd_pass();
+    return;
+  }
+
+  // for the rest, 
+  // make sure there's a param
+  if(    *(line+1) == '\0' /*
+      || *(line+1) != ' ' */
+      || *(line+2) == '\0') {
+    // command ends with no param
+    ser.println( kStr_Error_BadLine );
+    return;
+  }
+
+  switch( *line ) {
+    case( 'R' ):
+      
+      do_FileRead( line+2 );
+      break;
+      
+    case( 'W' ):
+      if( *(line+1) == 'H' ) {
+        /* Write IHX */
+        ser.print( "Open for Write IHX " );
+        ser.println( line+3 );
+      } else {
+        /* Write normal */
+        //do_OpenWrite( line+2 );
+        ser.print( "Open for Write " );
+        ser.println( line+2 );
+      }
+      break;
+      
+    case( 'A' ):
+      //do_OpenAppend( line+2 );
+        ser.print( "Open for Append " );
+        ser.println( line+2 );
+      break;
+    
+    default:
+      ser.println( kStr_Error_BadLine );
+      break;
+  }
+/*
+    ~FR path$   fopen( path, "r" );
+    ~FW path$   fopen( path, "w" );
+    ~FA path$   fopen( path, "a" ); fseek( 0, SEEK_END );
+    ~FWH path$  (write as IHX) (future)
+    ~FC$        fclose()
+    */
 }
 
 ////////////////////////////////////////////
@@ -163,6 +241,7 @@ void do_ls( const char * line )
 {
   File ppp;
   int nFiles = 0;
+  int nSubdirs = 0;
   
   ser.writeln( kStr_Begin );
 
@@ -180,9 +259,10 @@ void do_ls( const char * line )
     ser.print( entry.name() );
     if (entry.isDirectory()) {
       ser.println("/");
+      nSubdirs++;
     } else {
       // files have sizes, directories do not
-      ser.print(" , ");
+      ser.print( "," );
       unsigned long sz = entry.size();
       ser.println( sz, DEC);
       nFiles++;
@@ -190,7 +270,9 @@ void do_ls( const char * line )
     entry.close(); // Added
   }
   ser.print( kStr_End );
-  ser.println( nFiles );
+  ser.print( nFiles );
+  ser.print( "," );
+  ser.println( nSubdirs );
   
   ppp.close();
 }
@@ -226,7 +308,7 @@ void processPCommands( const char * line )
   // make sure there's a param
   if( *(line+1) == '\0' || *(line+1) != ' ' || *(line+2) == '\0') {
     // command ends with no param
-    ser.writeln( "PARAMERR" );
+    ser.println( kStr_Error_BadLine );
     return;
   }
   
@@ -235,8 +317,7 @@ void processPCommands( const char * line )
     case( 'M' ): do_mkdir( line+2 ); break;
     case( 'R' ): do_rm( line+2 ); break;
     default:
-      ser.write( "UNK ");
-      ser.writeln( line );
+      ser.println( kStr_Error_BadLine );
       break;
   }
 }
@@ -253,7 +334,7 @@ void processSCommands( const char * line )
 
 
 ////////////////////////////////////////////
-// L-commands
+// L-commands1211111111111111111111111111111111111111111111111111111111113rdcx
 //  undocumented, set the board LEDs for debugging
 
 void processLCommands( const char * line )
@@ -314,7 +395,7 @@ void serialPoll( void )
     char ch = ser.read();
 
     if( echo ) {
-      if( ch == '\n' ) ser.println();
+      if( ch == '\n' || ch=='\r' ) ser.println();
       else ser.write( ch );
     }
 
