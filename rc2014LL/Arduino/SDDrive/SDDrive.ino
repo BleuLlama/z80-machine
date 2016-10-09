@@ -45,24 +45,29 @@ void initSD()
 void sendSDInfo()
 {  
   if( errorSD == 1 ) {
-    ser.writeln( kStr_Error_InitFailed );
+    ser.print( kStr_Prot0 );
+    ser.println( kStr_Error_InitFailed );
   } else {
-    ser.writeln( kStr_CardOk );
+    ser.print( kStr_Prot0 );
+    ser.println( kStr_CardOk );
   }
 
   if (!volume.init(card)) {
+    ser.print( kStr_Prot0 );
     ser.println( kStr_Error_NoFatPartition );
     return;
   }
 
     // print the type and size of the first FAT-type volume
   uint32_t volumesize;
+  ser.print( kStr_Prot0 );
   ser.print( kStr_FAType );
   ser.println(volume.fatType(), DEC);
 
   volumesize = volume.blocksPerCluster();    // clusters are collections of blocks
   volumesize *= volume.clusterCount();       // we'll have a lot of clusters
   volumesize *= 512;                            // SD card blocks are always 512 bytes
+  ser.print( kStr_Prot0 );
   ser.print( kStr_Size );
 //  ser.println(volumesize);
 //  ser.print("~NVolume size (Kbytes): ");
@@ -77,10 +82,14 @@ void sendSDInfo()
 ////////////////////////////////////////////
 // System setup
 
+void resetFunc();
+void detectCard();
+
 void setup() {
   pinMode( kPinSDPresent, INPUT );
   serialInit();
   ser.println( );
+  ser.print( kStr_Prot0 );
   ser.println( kStr_Version );
 
   ledSetup();
@@ -110,22 +119,22 @@ char buf[ kMaxBuf ] = { '\0' };
 
 /* cheat sheet
     0123
-    ~I$         get system info
+    ~0:I$         get system info
 
-    ~PL path$   ls path
-    ~PM path$   mkdir path
-    ~PR path$   rm path
+    ~0:PL path$   ls path
+    ~0:PM path$   mkdir path
+    ~0:PR path$   rm path
 
     01234
-    ~FR path$   fopen( path, "r" );
-    ~FW path$   fopen( path, "w" );
-    ~FA path$   fopen( path, "a" ); fseek( 0, SEEK_END );
-    ~FS ascii$  fwrite( asciiStringToBinary( ascii ));
-    ~FC$        fclose()
+    ~0:FR path$   fopen( path, "r" );
+    ~0:FW path$   fopen( path, "w" );
+    ~0:FA path$   fopen( path, "a" ); fseek( 0, SEEK_END );
+    ~0:FS ascii$  fwrite( asciiStringToBinary( ascii ));
+    ~0:FC$        fclose()
 
     0123
-    ~SR D T S$    read drive D, track T, sector S to buffer
-    ~SW D T S$    write buffer to drive D, track T, sector S
+    ~0:SR D T S$    read drive D, track T, sector S to buffer
+    ~0:SW D T S$    write buffer to drive D, track T, sector S
 */
 
 
@@ -134,12 +143,14 @@ char buf[ kMaxBuf ] = { '\0' };
 void cmd_fail( void )
 {
   ser.println();
+  ser.print( kStr_Prot0 );
   ser.println( kStr_Error_CmdFail );
 }
 
 void cmd_pass( void )
 {
   ser.println();
+  ser.print( kStr_Prot0 );
   ser.println( kStr_CmdOK );
 }
 
@@ -174,6 +185,25 @@ void do_FileRead( const char * path )
   myFile.close();
 }
 
+void do_FileWriteString( const char * string )
+{
+  ser.print( "write string " );
+  ser.println( string );
+}
+
+void do_FileOpenAppend( const char * path )
+{
+  ser.print( "Open for append " );
+  ser.println( path );
+}
+
+void do_FileOpenWrite( const char * path  )
+{
+  ser.print( "Open for write " );
+  ser.println( path );
+}
+
+
 void processFCommands( const char * line )
 {
 //  ser.write( "F Command: " );
@@ -187,50 +217,44 @@ void processFCommands( const char * line )
 
   // for the rest, 
   // make sure there's a param
-  if(    *(line+1) == '\0' /*
-      || *(line+1) != ' ' */
+  if(    *(line+1) == '\0'
+      || *(line+1) != ' ' 
       || *(line+2) == '\0') {
     // command ends with no param
+    ser.print( kStr_Prot0 );
     ser.println( kStr_Error_BadLine );
     return;
   }
 
+
   switch( *line ) {
     case( 'R' ):
-      
       do_FileRead( line+2 );
       break;
       
     case( 'W' ):
-      if( *(line+1) == 'H' ) {
-        /* Write IHX */
-        ser.print( "Open for Write IHX " );
-        ser.println( line+3 );
-      } else {
-        /* Write normal */
-        //do_OpenWrite( line+2 );
-        ser.print( "Open for Write " );
-        ser.println( line+2 );
-      }
+      do_FileOpenWrite( line+2 );
+      ser.print( "Open for Write " );
+      ser.println( line+2 );
       break;
       
     case( 'A' ):
-      //do_OpenAppend( line+2 );
-        ser.print( "Open for Append " );
-        ser.println( line+2 );
+      do_FileOpenAppend( line+2 );
+      ser.print( "Open for Append " );
+      ser.println( line+2 );
+      break;
+
+    case( 'S' ):
+      do_FileWriteString( line+2 );
+      ser.print( "Sending " );
+      ser.println( line+2 );
       break;
     
     default:
+      ser.print( kStr_Prot0 );
       ser.println( kStr_Error_BadLine );
       break;
   }
-/*
-    ~FR path$   fopen( path, "r" );
-    ~FW path$   fopen( path, "w" );
-    ~FA path$   fopen( path, "a" ); fseek( 0, SEEK_END );
-    ~FWH path$  (write as IHX) (future)
-    ~FC$        fclose()
-    */
 }
 
 ////////////////////////////////////////////
@@ -243,7 +267,8 @@ void do_ls( const char * line )
   int nFiles = 0;
   int nSubdirs = 0;
   
-  ser.writeln( kStr_Begin );
+  ser.print( kStr_Prot0 );
+  ser.println( kStr_Begin );
 
   ppp = SD.open( line );
   ppp.seek( 0 );
@@ -255,7 +280,8 @@ void do_ls( const char * line )
       entry.close(); // Added
       break;
     }
-    
+
+    ser.print( kStr_Prot0 );
     ser.print( entry.name() );
     if (entry.isDirectory()) {
       ser.println("/");
@@ -269,6 +295,7 @@ void do_ls( const char * line )
     }
     entry.close(); // Added
   }
+  ser.print( kStr_Prot0 );
   ser.print( kStr_End );
   ser.print( nFiles );
   ser.print( "," );
@@ -308,6 +335,7 @@ void processPCommands( const char * line )
   // make sure there's a param
   if( *(line+1) == '\0' || *(line+1) != ' ' || *(line+2) == '\0') {
     // command ends with no param
+    ser.print( kStr_Prot0 );
     ser.println( kStr_Error_BadLine );
     return;
   }
@@ -317,6 +345,7 @@ void processPCommands( const char * line )
     case( 'M' ): do_mkdir( line+2 ); break;
     case( 'R' ): do_rm( line+2 ); break;
     default:
+      ser.print( kStr_Prot0 );
       ser.println( kStr_Error_BadLine );
       break;
   }
@@ -329,6 +358,7 @@ void processPCommands( const char * line )
 
 void processSCommands( const char * line )
 {
+  ser.print( kStr_Prot0 );
   ser.println( kStr_Error_NotImplemented );
 }
 
@@ -356,18 +386,37 @@ void processLine( void )
     buf[0] = '\0';
     return;
   }
+
+  if( buf[0] == '-' ) {
+    // It's a response from another node. Let's inc the id and send it through
+    buf[1]++;
+    ser.println( buf );
+    buf[0] = '\0';
+    return;
+  }
+
+  if(    buf[0] == '~' 
+      && buf[1] != '0' ) {
+    // It's a command for another node.  Let's dec the id and send it through...
+    buf[1]--;
+    ser.println( buf );
+    buf[0] = '\0';
+    return;
+  }
   
   if( buf[0] != '~' ) {
     // if there's no ~, it's a failure command
-    ser.writeln( kStr_Error_BadLine );
-    ser.write( kStr_Error_LEcho );
-    ser.writeln( buf );
+    ser.print( kStr_Prot0 );
+    ser.println( kStr_Error_BadLine );
+    ser.print( kStr_Prot0 );
+    ser.print( kStr_Error_LEcho );
+    ser.println( buf );
     buf[0] = '\0';
     return;
   }
 
   // ok. let's hand off control to the appropriate processor
-  switch( buf[1] ) {
+  switch( buf[3] ) {
     case( 'e' ):
       // toggle echo
       echo ^= 1;
@@ -375,10 +424,10 @@ void processLine( void )
       
     case( 'I' ): sendSDInfo(); break;
     
-    case( 'F' ): processFCommands( &buf[2] ); break;
-    case( 'P' ): processPCommands( &buf[2] ); break;
-    case( 'S' ): processSCommands( &buf[2] ); break;
-    case( 'L' ): processLCommands( &buf[2] ); break;
+    case( 'F' ): processFCommands( &buf[4] ); break;
+    case( 'P' ): processPCommands( &buf[4] ); break;
+    case( 'S' ): processSCommands( &buf[4] ); break;
+    case( 'L' ): processLCommands( &buf[4] ); break;
     default:
       break;
   }
@@ -419,7 +468,8 @@ void serialPoll( void )
 /* call this to reset the arduino */
 //void(* resetFunc) (void) = 0;
 
-void resetFunc() // Restarts program from beginning but does not reset the peripherals and registers
+// Restarts program from beginning but does not reset the peripherals and registers
+void resetFunc() 
 {
   asm volatile ("jmp 0");  
 } 
@@ -433,6 +483,7 @@ void detectCard()
 
   // NO CARD
   if( !cardPresent ) {
+    ser.print( kStr_Prot0 );
     ser.println( kStr_Error_NoCard );
     ledEmoteError();
     resetFunc();

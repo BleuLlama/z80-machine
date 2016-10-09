@@ -20,6 +20,9 @@ connected directly to a level-shifting SD card interface.  It has
 three LEDs on the drive board, red, yellow, and gren, which can
 indicate various states of operation.
 
+The protocol described here supports multiple drives on the same
+serial chain.
+
 
 ----------------------------------------
                                  Arduino
@@ -68,13 +71,19 @@ NOTE: Although it runs at such a fast baud rate, there is throttling
 
 On startup, or device reset, it may send:
 
-    -N0=SDD1,v002
-    -E0=No card
+    -0:N0=SDD1,v004
+    -0:E0=No card
 
-Notice (-Nx=) that it is SDD1 version 002
-Error (-Ex=)0: No card is inserted.
+Drive zero (-0:).  all drives emit drive '0' and respond to drive '0'.
+Notice (Nx=) that it is SDD1 version 004
+Error (Ex=)0: No card is inserted.
 
-Notices start with -N and errors start with -E.  After that, the
+All drives identify as device zero.  Their visible device ID to the
+host is determined by their position in the serial chain.  The first
+device after the host on the chain is device 0.  Next is device 1,
+and so on. 
+
+Notices start with "N" and errors start with "E".  After that, the
 next character is the error code.  Next is an equals sign, and then
 text, possibly comma separated, until a newline.
 
@@ -85,13 +94,56 @@ N0 notice as above, but also with Error code 0, as above.
 
 Once a card has been inserted, it may send something like:
 
-    -N0=SDD1,v002
-    -N1=Card OK
-    -Nt=FAT16
-    -Ns=952,meg
+    -0:N0=SDD1,v004
+    -0:N1=Card OK
+    -0:Nt=FAT16
+    -0:Ns=952,meg
 
 It's pretty obvious what these responding fields mean.  See the
-Appendices below for more explanation of them
+Appendices below for more explanation of them.
+
+All commands sent to devices are prefixed with a tilde '~' character,
+while all responses from devices are prefixed with a dash '-'
+character.
+
+All devices respond as device 0.  If a device gets a command for
+not-zero, the message's id is decremented and then re-transmitted.
+If a device gets a response, it will increment the message's id and
+then retransmitted.
+
+For example, if we have a setup with three drives, like so:
+
+[Host computer] ---> [Drive A] ---> [Drive B] ---> [Drive C] --> (return)
+      ^                                                             |
+      +-------------------------------------------------------------+
+
+And the host wants to send the request message for Information from
+drive B, it will send:
+
+	~1:I
+
+Drive A gets this, sees that the ID is '1', and not for it, so it
+decrements that ID and re-sends the message.  It will send out:
+
+	~0:I
+
+Next, Drive B gets this, sees that the ID is '0', which it identifies
+as! So it generates some response and sends it out with the ID of
+0 as well:
+
+	-0:N0=SDD1,v004
+	-0:Nt=FAT16
+
+Next, Drive C gets this, sees that it's just a response, so it
+passes it along down the chain, after incrementing the ID in the
+message.
+
+	-1:N0=SDD1,v004
+	-1:Nt=FAT16
+
+Which is what the host gets back.  It should be noted that for
+sending out messages, device 0 is the first on the chain, while for
+responses, drive 0 is the last on the chain.
 
 
 ------------------------------
@@ -108,23 +160,23 @@ and by letter.
 --------------------
        Info commands
 
-~I
+~0:I
 	Respond with drive info.  Usually the notice sequence:
 	N0, N1, Nt, Ns
 
 	Example:
 
-	    ~I
-	    -N1=Card OK
-	    -Nt=FAT16
-	    -Ns=952,meg
+	    ~0:I
+	    -0:N1=Card OK
+	    -0:Nt=FAT16
+	    -0:Ns=952,meg
 
 
 
 --------------------
        Path commands
 
-~PL <path>
+~0:PL <path>
 	List the files in the specified path.  It will list all
 	files and directories in up to 8.3 format.
 
@@ -141,34 +193,34 @@ and by letter.
 
 	Example:
 
-	    ~PL BASIC
-	    -Nbf=
-	    LLTEST.BAS,963
-	    USRTEST.BAS,4571
-	    -Nef=2
+	    ~0:PL BASIC
+	    -0:Nbf=
+	    -0:LLTEST.BAS,963
+	    -0:USRTEST.BAS,4571
+	    -0:Nef=2
 
 	Similar to "dir" or "ls"
 
 
-~PM <path>
+~0:PM <path>
 	Create a subdirectory with the path specified. 
 
 	Example:
 	
-	    ~PM FOOBAR
-	    -N2=OK
+	    ~0:PM FOOBAR
+	    -0:N2=OK
 
 	Similar to "mkdir"
 
 
-~PR <path>
+~0:PR <path>
 	Delete a file or empty subdirectory.  If it cannot remove
 	the file or subdirectory, it responds with E6.
 
 	Example:
 
-	    ~PR FOOBAR
-	    -N2=OK
+	    ~0:PR FOOBAR
+	    -0:N2=OK
 
 	Similar to "rm", "rmdir", "del"
 
@@ -185,18 +237,15 @@ Hex values.  The only valid content is the characters '0'-'9',
 be ignored.
 
 
-~FR <path>
+~0:FR <path>
 	Opens the file at <path> on the SD card for raw reading.
 
 	The file will be streamed from the SSDD1 to the host.  File
 	content will be between "Nbf" and "Nef" tags. 
 
-	Once the '-' character is encountered, it will be assumed
-	to be the end of the file, and a "Nef" tag will be next.
-
 	If the file cannot be found, "E9" will be returned.
 
-~FW <path>
+~0:FW <path>
 	Opens the file at <path> on the SD card for writing.  This
 	will erase the currently existing contents, if there are
 	any.  The file will remain open (and may not get flushed)
@@ -204,12 +253,12 @@ be ignored.
 
 	If the file cannot be opened, "EA" will be returned.
 
-~FA <path>
+~0:FA <path>
 	Opens the file at <path> on the SD card for append.  Same
 	basic idea as FW.  If the file does not yet exist, then the
 	behavior is the same as FW.
 
-~FS <string to newline>
+~0:FS <string to newline>
 	Send the string to be written to the SD card. It should be
 	in Asciified binary format. Only characters in the valid
 	range as explained above will be observed.  Each string sent
@@ -225,7 +274,7 @@ be ignored.
 
 	If no file is open, it will respond with "E8".
 
-~FC
+~0:FC
 	Closes the currently open file for read or write.
 
 
@@ -245,13 +294,23 @@ However, due to implementation it can be any string in any of those
 three locations.  For this document, these three parameters will
 be referred to as simply "DTS".
 
-~SR <drive> <track> <sector>
-	Sector read from specified DTS.  The content transferred
-	will be in IHX format.
+For ease of operation and transferring data, Sector commands use their
+own 
 
-~SW <drive> <track> <sector>
-	Sector write to specified DTS.  The content transferred
-	will be in IHX format.
+~0:SR <drive> <track> <sector>
+	Sector read from specified DTS. The content transferred
+	will be in asciified binary format, as explained above.
+	The content will be between Nbs and Nes notice tags
+
+~0:SW <drive> <track> <sector>
+	Sector open for write to specified DTS. 
+
+~0:SS <string to newline>
+	Sector data to write to the currently open file.  The content
+	and formatting are identical to ~0:FS above.
+
+~0:SC
+	Close the currently open sector file.
 
 
 ----------------------------------------
@@ -263,6 +322,8 @@ be referred to as simply "DTS".
 	Ns	Drive size,units
 	Nbf	File content begins
 	Nef	File content ends
+	Nbs	Sector content begins
+	Nes	Sector content ends
 
 ----------------------------------------
                       Appendix B: Errors
