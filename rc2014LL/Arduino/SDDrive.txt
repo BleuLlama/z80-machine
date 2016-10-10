@@ -180,10 +180,11 @@ and by letter.
 	List the files in the specified path.  It will list all
 	files and directories in up to 8.3 format.
 
-	Responds with an "Nbf=" notice.  Then on consecutive lines,
+	Responds with an "Nbf=" notice. The content of this notice
+	is the path that is being read.  Then on consecutive lines,
 	it contains one file or directory name per line. It then
 	ends with a "Nef=" notice, where the content is the number
-	of files,subdirectories. 
+	of files,subdirectories.
 
 	Each line will contain the <SUBDIR>+"/" if the preceeding
 	path information is of a subdirectory.
@@ -194,7 +195,7 @@ and by letter.
 	Example:
 
 	    ~0:PL BASIC
-	    -0:Nbf=
+	    -0:Nbf=BASIC
 	    -0:LLTEST.BAS,963
 	    -0:USRTEST.BAS,4571
 	    -0:Nef=2
@@ -245,12 +246,14 @@ be ignored.
 	ASCII HEX values, defined with NS tags. (See the example
 	below.
 
+	The Nbf tag's contents will be the path to the file specified.
+
 	If the file cannot be found, "E9" will be returned.
 
 	Example:
 
 	    ~0:FR test.txt
-	    -0:Nbf=
+	    -0:Nbf=test.txt
 	    -0:NS=48656C6C6F2C20776F726C64210A0A3A440A0A2D
 	    -0:NS=730A
 	    -0:Nef=22
@@ -261,7 +264,7 @@ be ignored.
 	such. Here's an example from a larger file:
 
 	    ~0:FR readme.txt
-	    -0:Nbf=
+	    -0:Nbf=readme.txt
 	    -0:NS=0A2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D0A4D69
 	    -0:NS=63726F4C6C616D6120353030300A323031362D30
 	    -0:NS=372D31350A53636F7474204C617772656E63650A
@@ -286,17 +289,15 @@ be ignored.
 
 
 ~0:FW <path>
-	Opens the file at <path> on the SD card for writing.  This
-	will erase the currently existing contents, if there are
-	any.  The file will remain open (and may not get flushed)
-	until the ~FC close command is sent.
+	Opens the file at <path> on the SD card for writing.  If
+	the file exists already, subsequent writes will occur at
+	the end of the file.  The file will remain open (and may
+	not get flushed) until the ~FC close command is sent.
 
 	If the file cannot be opened, "EA" will be returned.
 
-~0:FA <path>
-	Opens the file at <path> on the SD card for append.  Same
-	basic idea as FW.  If the file does not yet exist, then the
-	behavior is the same as FW.
+	Example:
+	    (see FS example below)
 
 ~0:FS <string to newline>
 	Send the string to be written to the SD card. It should be
@@ -314,8 +315,31 @@ be ignored.
 
 	If no file is open, it will respond with "E8".
 
+	the response for each line passed is a Nc tag, whose two
+	parameters are the number of bytes (10 in the example that
+	follows, then the checksum of the actual data (not the ASCII
+	sent) which is computed the same way as with the Intel Hex
+	File (HEX,IHX) format.  (All of the bytes are summed, then
+	the LSByte of the sum's twos-compliment value is taken of
+	it.  (See Appendix C for more info.) Both values are in
+	hex.
+
+	Example:
+	    ~0:FW newfile.txt
+	    -0:N2=OK
+	    ~0:FS 30313233343536373839
+	    -0:Nc=0A,9A
+	    ~0:FS 40414243444546474849
+	    -0:Nc=0A,33
+	    ~0:FC
+	    -0:N2=OK
+
 ~0:FC
-	Closes the currently open file for read or write.
+	Closes the currently open file for read or write.  Does
+	nothing if no file is open. It should always succeed.
+
+	Example:
+	    (see FS example above.)
 
 
 
@@ -342,15 +366,46 @@ own
 	will be in asciified binary format, as explained above.
 	The content will be between Nbs and Nes notice tags
 
+	Example:
+	    ~0:SR A 0002 0301
+	    -0:Nbs=
+	    -0:SS=00000000000000000000000000000000
+	    -0:SS=00000000000000000000000000000000
+		...
+	    -0:SS=00000000000000000000000000000000
+	    -0:Nes=128
+
 ~0:SW <drive> <track> <sector>
-	Sector open for write to specified DTS. 
+	Sector open for write to specified DTS.  Operates as FW
+	above.
+
+	Example:
+	    (See SS example below)
+
 
 ~0:SS <string to newline>
 	Sector data to write to the currently open file.  The content
 	and formatting are identical to ~0:FS above.
 
+	Example:
+	    ~0:SW A 0002 0301
+	    -0:N2=OK
+	    ~0:SS=00000000000000000000000000000000
+	    -0:Nc=10,9A
+	    ~0:SS=00000000000000000000000000000000
+	    -0:Nc=10,9A
+		...
+	    ~0:SS=00000000000000000000000000000000
+	    -0:Nc=10,9A
+	    ~0:SC
+	    -0:N2=OK
+
 ~0:SC
-	Close the currently open sector file.
+	Closes the currently open sector file for write.  Does
+	nothing if no file is open. It should always succeed.
+
+	Example:
+	    (See SS example above)
 
 
 ----------------------------------------
@@ -385,7 +440,7 @@ own
 ----------------------------------------
                   Appendix C: IHX Format
 
-The two types of IHX records supported in the SSDDS are:
+The two primary types of IHX records are:
 
 	00 - Data
 	01 - End Of File
@@ -427,7 +482,8 @@ Which should be identical to every end of file record. ;)
 ----------------------------------------
              Appendix D: Version History
 
-v003  2016-
+v004  2016-10-10 - Sector IO docs added
+v003  2016-10-09 - File IO docs added
 v002  2016-10-08 - Initial new version, P commands
 v001  2016-10-01 - Internal version, old xfer protocol
 
