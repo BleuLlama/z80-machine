@@ -160,29 +160,68 @@ void cmd_pass( void )
 //  File IO commands
 
 
+// ~0:FR TEST.TXT
 void do_FileRead( const char * path )
 {
-  ser.print( "Open for read " );
-  ser.println( path );
+  int nper = 0;
+  int ch;
+  int progress = 0;
+  char asciihex[4];
+
+  ledEmoteRead();
   
+  /* attempt to open or fail */  
   File myFile = SD.open( path );
   if( !myFile ) {
     cmd_fail();
+    ledEmoteOk();
     return;
   }
 
+  /* get filesize */
   unsigned long sz = myFile.size();
-  ser.println( sz, DEC );
 
-  while( myFile.available() ) {
-    int ch = myFile.read();
-    
-    if( ch == '\n' || ch=='\r' ) ser.println();
-    else ser.write( ch );
+  /* output the header */
+  ser.print( kStr_Prot0 );
+  ser.println( kStr_Begin );
+  
+  while( myFile.available() ) 
+  {
+
+    if( nper == 0 ) {
+      ser.print( kStr_Prot0 );
+      ser.print( kStr_DataString );
+    }
+
+    ch = myFile.read();
+    sprintf( asciihex, "%02X", ch );
+    ser.print( asciihex );
+
+    nper++;
+    progress++;
+    if( nper == 20 ) // number of bytes per line
+    {
+      ser.println();
+      if( ( progress % 100 ) == 0 ) {
+        ser.print( kStr_Prot0 );
+        ser.print( kStr_Progress );
+        ser.print( progress ); ser.print( "/" ); ser.println( sz );
+      }
+      
+      nper = 0;
+    }
   }
+
+  /* footer */
+  ser.println(); 
+  ser.print( kStr_Prot0 );
+  ser.print( kStr_End );
+  ser.println( sz, DEC );
 
   cmd_pass();
   myFile.close();
+
+  ledEmoteOk();
 }
 
 void do_FileWriteString( const char * string )

@@ -241,9 +241,49 @@ be ignored.
 	Opens the file at <path> on the SD card for raw reading.
 
 	The file will be streamed from the SSDD1 to the host.  File
-	content will be between "Nbf" and "Nef" tags. 
+	content will be between "Nbf" and "Nef" tags, provided as
+	ASCII HEX values, defined with NS tags. (See the example
+	below.
 
 	If the file cannot be found, "E9" will be returned.
+
+	Example:
+
+	    ~0:FR test.txt
+	    -0:Nbf=
+	    -0:NS=48656C6C6F2C20776F726C64210A0A3A440A0A2D
+	    -0:NS=730A
+	    -0:Nef=22
+	    -0:N2=OK
+
+	Note: There may be additional optional content sent between
+	the Nbf and Nef tags to assist in progress displays and
+	such. Here's an example from a larger file:
+
+	    ~0:FR readme.txt
+	    -0:Nbf=
+	    -0:NS=0A2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D0A4D69
+	    -0:NS=63726F4C6C616D6120353030300A323031362D30
+	    -0:NS=372D31350A53636F7474204C617772656E63650A
+	    -0:NS=796F72676C6540676D61696C2E636F6D0A2D2D2D
+	    -0:NS=2D2D2D2D2D2D2D2D2D2D2D2D2D0A0A5468697320
+	    -0:NP=100/742
+	    -0:NS=6973207468652064656661756C7420534420636F
+	    -0:NS=6E74656E747320666F7220746865205243323031
+	    .......
+	    -0:NS=6C65206469736B20696D61676520636F6E74656E
+	    -0:NS=74730A20202020534644492F43094469736B2044
+	    -0:NP=700/742
+	    -0:NS=20736563746F722066696C65206469736B20696D
+	    -0:NS=61676520636F6E74656E74730A202020202E2E2E
+	    -0:NS=0A0A
+	    -0:Nef=742
+
+	You can see the additional NP tags in there showing
+	file progress notification.  The two fields are: 
+
+	    (current byte count)/(total file size)
+
 
 ~0:FW <path>
 	Opens the file at <path> on the SD card for writing.  This

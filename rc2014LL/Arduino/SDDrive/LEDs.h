@@ -26,6 +26,11 @@ void ledSet( int mask, int spd );
 void ledEmoteOk();
 void ledEmoteError();
 
+void ledEmoteRead();
+void ledEmoteWrite();
+
 void ledSetup( void );
 
 #endif
+
+

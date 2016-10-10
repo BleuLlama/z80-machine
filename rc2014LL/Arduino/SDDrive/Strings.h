@@ -52,3 +52,6 @@
 #define kStr_Begin                "Nbf="  /* begin file content */
 #define kStr_End                  "Nef="  /* end file content */
 
+#define kStr_DataString           "NS="
+#define kStr_Progress             "NP="
+

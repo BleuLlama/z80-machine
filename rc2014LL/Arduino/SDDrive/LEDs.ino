@@ -54,7 +54,7 @@ void ledSet( int mask, int spd )
 {
   ledSpeed = spd;
   
-  if( mask == ledMask ) return;
+  if( mask == ledMask && spd == ledSpeed ) return;
   ledMask = mask;
 
   /* turn them all off */
@@ -75,6 +75,19 @@ void ledEmoteError()
   ledSet( kRed, 0 ); /* red, fast */
   ledDelay( 1000 );
 }
+
+
+void ledEmoteRead()
+{
+  ledSet( kGreen, 9999 );
+}
+
+void ledEmoteWrite()
+{
+  ledSet( kRed, 9999 );
+}
+
+
 void ledSetup( void )
 {
   pinMode( kPinLEDRed, OUTPUT );
