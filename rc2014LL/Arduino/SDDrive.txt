@@ -58,7 +58,7 @@ The LED indicators mean as follows:
 - Solid amber - device has a file open for read
 
 
-----------------------------------------
+----------------------------------------
                                 Protocol
 
 The SSDD1 talks on TTL level serial at 115200 baud, 8 bits, No
@@ -146,7 +146,7 @@ sending out messages, device 0 is the first on the chain, while for
 responses, drive 0 is the last on the chain.
 
 
-------------------------------
+------------------------------
                       Commands
 
 Commands are sent from the host computer to the SSDD1.  They are
@@ -172,8 +172,7 @@ and by letter.
 	    -0:Ns=952,meg
 
 
-
---------------------
+--------------------
        Path commands
 
 ~0:PL <path>
@@ -226,7 +225,7 @@ and by letter.
 	Similar to "rm", "rmdir", "del"
 
 
---------------------
+--------------------
        File commands
 
 Files are transferred over the wire in Asciified HEX values. The 
@@ -342,8 +341,7 @@ be ignored.
 	    (see FS example above.)
 
 
-
---------------------
+--------------------
      Sector commands
 
 These commands are used to write and read from virtual drives.  They
@@ -408,7 +406,7 @@ own
 	    (See SS example above)
 
 
-----------------------------------------
+----------------------------------------
                      Appendix A: Notices
 
 	N0	Notice of device ID and version
@@ -445,8 +443,6 @@ The two primary types of IHX records are:
 	00 - Data
 	01 - End Of File
 
-And their spec follows...
-
 <colon><number of bytes><start address><record type><data><checksum>
 
 The checksum is computed by summing each individual byte from the
@@ -459,7 +455,6 @@ For example, the data record:
 	:--____--======++
 
 Can be separated into fields:
-
     - number of bytes of data: 0x03
     - start address: 0x0030
     - record type: 0x00  (Data)
@@ -472,7 +467,6 @@ Here's an example End of File record:
 	:--____--++
 
 Which should be identical to every end of file record. ;)
-
     - number of bytes of data: 0x00 (no data bytes)
     - start address: 0x0000 (no start address)
     - record type: 0x01 (End of File record)
@@ -486,4 +480,3 @@ v004  2016-10-10 - Sector IO docs added
 v003  2016-10-09 - File IO docs added
 v002  2016-10-08 - Initial new version, P commands
 v001  2016-10-01 - Internal version, old xfer protocol
-
