@@ -160,9 +160,10 @@ str_prompt:
 
 str_menu:
 	.ascii	"== Menu ==\r\n"
-	.ascii	"  [B] boot.rom\r\n"
-	.ascii	"  [3] basic.32.rom\r\n"
-	.ascii	"  [5] basic.56.rom\r\n"
+	.ascii	"  [B] boot.hex\r\n"
+	.ascii	"  [C] cpm.hex\r\n"
+	.ascii	"  [3] basic32.hex\r\n"
+	.ascii	"  [5] basic56.hex\r\n"
 	.ascii  "\r\n"
 	.ascii	"  [A] applications\r\n"
 	.ascii	"  [F] files\r\n"
@@ -203,6 +204,9 @@ MM_prompt:
 	call	z, DoBootBasic56
 
 	call	ToUpper
+
+	cp	#'C
+	call	z, DoBootCPM
 
 .if( Emulation )
 	cp	#'Q		; 'Q' - quit the emulator
@@ -500,6 +504,10 @@ EnableROM:
 	;;;;;;;;;;;;;;;
 	; boot roms
 
+DoBootCPM:
+	ld	hl, #cmd_bootCPM
+	jr	DoBootB	
+
 DoBootBasic32:
 	ld	hl, #cmd_bootBasic32
 	jr	DoBootB	
@@ -513,8 +521,6 @@ DoBootBasic56:
 DoBoot:
 	ld	hl, #cmd_bootfile
 DoBootB:
-	call	SendSDCommand
-	ld	hl, #cmd_bootread
 	call	SendSDCommand
 
 
@@ -590,12 +596,10 @@ endSwapOutRom:
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 str_filereadme:
-	.asciz 	"~Freadme.txt\n"
+	.asciz 	"~0:FR readme.txt\n"
 
 catFile:
 	ld	hl, #str_filereadme; select file
-	call	SendSDCommand
-	ld	hl, #cmd_bootread ; open for read
 	call	SendSDCommand
 
 catSDPort:
@@ -634,9 +638,6 @@ CFRet:
 
 
 directoryList:
-	ld	hl, #cmd_dirpath
-	call	SendSDCommand
-
 	ld	hl, #cmd_directory
 	call	SendSDCommand
 	jr	catSDPort	; pretend it's a cat'd file!
@@ -646,6 +647,8 @@ directoryList:
 ; Text strings
 
 ; Version history
+;   v009 2016-10-11 - Internal support for hex, new SD interface
+;   v008 2016-09-28 - Terminal fixed, new file io command strings
 ;   v007 2016-07-14 - Menu rearrange, better Hexdump
 ;   v006 2016-07-07 - SD load and boot working again
 ;   v005 2016-06-16 - New menus?
@@ -655,39 +658,36 @@ directoryList:
 ;   v001 2016-05-09 - initial version, functional
 
 str_splash:
-	.ascii	"Lloader Shell for MicroLlama 5000\r\n"
-	.ascii	"  v007 2016-July-14  Scott Lawrence\r\n"
+	.ascii	"Lloader Shell for RC2014/LL MicroLlama\r\n"
+	.ascii	"  v009 2016-Oct-11  Scott Lawrence\r\n"
 	.asciz  "\r\n"
 	
+cmd_getinfo:
+	.asciz  "~0:I\n"
+
 cmd_bootfile:
-	.asciz	"~FROMs/boot.rom\n"
+	.asciz	"~0:FR ROMs/boot.hex\n"
+
+cmd_bootCPM:
+	.asciz	"~0:FR ROMs/cpm.hex\n"
 
 cmd_bootBasic32:
-	.asciz	"~FROMs/basic.32.rom\n"
+	.asciz	"~0:FR ROMs/basic32.hex\n"
 
 cmd_bootBasic56:
-	.asciz	"~FROMs/basic.56.rom\n"
-
-cmd_bootread:
-	.asciz	"~R\n"
-
-cmd_bootsave:
-	.asciz	"~S\n"
+	.asciz	"~0:FR ROMs/basic56.hex\n"
 
 str_loaded:
 	.asciz 	"Done loading. Restarting...\n\r"
 
 str_nofile:
-	.asciz	"Couldn't load specified rom.\n\r"
+	.asciz	"Couldn't load hex file.\n\r"
 
 str_line:
 	.asciz	"--------------\n\r"
 
-cmd_dirpath:
-	.asciz	"~DROMs\n"
-
 cmd_directory:
-	.asciz	"~L\n"
+	.asciz	"~0:PL \n"
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

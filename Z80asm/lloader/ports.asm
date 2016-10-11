@@ -83,7 +83,7 @@ TerminalApp:
 
 	; check for input from either port
 
-TA0:
+TermLoop:
 	call	KbHit
 	call	z, TermToSD	; something outgoing... send it!
 
@@ -91,10 +91,10 @@ TA0:
 	jr	z, TermExit	; we're done!
 
 	in	a, (SDStatus)
-	and	#DataReady
+	and	#DataReady	; mask off the "data is ready bit
 	call	z, SDToTerm	; something incoming... get a byte
 
-	jr	TA0
+	jr	TermLoop
 
 
 TermExit:

@@ -18,103 +18,7 @@
 
 /* ********************************************************************** */
 
-/*
-	New methodology (from the flowchart)
-
-	int shiftSendBit;  // 0x11 for two nibs to send, 0x00 for none
-	char sendByte;     // the byte we're sending now
-	int moreToSend;    // more content in the file (for chip emu)
-
-    start()
-	shiftSendBit = 0x00;
-	sendByte = '\0';
-	openFile();
-	moreToSend = 1;
-
-    done()
-	moreToSend = 0;
-	closeFile();
-
-    loop()
-	// check if we need to refill the sendByte
-	if( 0x00 == (shiftSendBit & 0x03) )
-	{
-	    if( !isNextSendByte() ) {
-		// no more bytes to send
-		sendByte = 'Z';
-		shiftSendBit = 0x03;
-			
-	    } else {
-		sendByte = getNextSendByte();
-		shiftSendBit = 0x03;
-	    }  
-	}
-
-	// send a nib
-	nib = 0x00;
-	if( shiftSendBit == 0x03 )
-	{
-	    nib = (sendByte >> 4) & 0x0F;
-	} else {
-	    // shiftSendBit is 0x01
-	    nib = sendByte & 0x0F;
-	}
-	sendOutByte( ValToHexscii( nib ));
-
-	// adjust our sentinel flags
-	shiftSendBit >>= 1;
-
-	// adjust moreToSend
-	if( sendByte == 'Z' && shiftSendBit == 0x00 ) {
-	    // we do not have more content
-	    moreToSend = 0;
-	} else {
-	    // we have more content
-	    moreToSend = 1;
-	}
- */
-
-
-/* Serial interface to the Mass Storage 
- *
- * Status byte will respond if there's more data to be read in
- *
- *  *$ means "ignore everything until end of line"
- *  Commands should read the items they know and ignore until whitespace
- *  or end of line as appropriate
- *
- *  <tilde><cmd><cmd opts (opt.)><space><args (opt.)><dollarSign><newline>
- *  "~<cmd>$\n"
- *  "~<cmd> <args>$\n"
- *
- * Directory
- *   ~L path$		List directory (returned as an ascii file ~FR)
- *			files are on lines by themselves.
- *			lines alternate with <name>,<size>
- *			directores are prepended with a /
- *			directories file size is empty
- *   ~M path$		Create directory (no response)
- *
- * Delete
- *   ~D path$		Delete file or directory
- *
- * File Read
- *   ~FR filename$	File Read as (2 bytes hex per byte of file)
- *			characters used: 0-9,A-F (uppercase)
- *			Newlines may be sent and should be ignored
- *			Ends with ZZ
- * File Write
- *   ~FW filename$	File Write Ascii (as above)
- *   ~FA filename$	File Append Ascii (as above, file is not overwritten)
- *
- *   ~FWH filename$	Write out as intel hex (as above)
- *			File is sent as intel hex format
- *			(Addresses preserved)
- *
- * Sector based file IO (future)
- *   ~SR D S$		Read Drive "D" sector "S"
- *   ~SW D S$		Write Drive "D" sectorn "S"
- * 
+/* See the Arduino implementation and document for the full design
  */
 
 /* Meta State */
@@ -142,19 +46,13 @@ void MassStorage_Init( void )
 
 static char val2ascii( int val )
 {
-	char *hexit = "0123456789ABCDEF";
+	const char *hexit = "0123456789ABCDEF";
 	val = val & 0x0F;
 	return hexit[val];
 }
 
-#define kBufSize (512)
 FILE * fp = NULL;
-char buffer[ kBufSize ];
-int nInBuf = 0;
-int nSent = 0;
 
-#define kReadBufSize (1024 * 1024);	/* 1 meg. why not */
-char readBuffer[ 64 * 1024 ];
 
 /* MassStorage_RX
  *   handle the simulation of the SD module sending stuff
@@ -212,8 +110,6 @@ static void MassStorage_Start_Read( char * path )
 		printf( "EMU: SD: Can't open %s\n", pathbuf );
 		return;
 	}
-
-	nInBuf = 0;
 }
 
 
@@ -248,29 +144,43 @@ static void MassStorage_End_File( void )
 	if( fp != NULL ) {
 		fclose( fp );
 		fp = NULL;
-		nInBuf = 0;
 	}
 }
 
 
 /* ********************************************************************** */
 
-/*
+/* cheat sheet
     0123
-    ~I$		get system info
-    ~L path$	ls path
-    ~M path$	mkdir path
-    ~D path$	rm path
+    ~0:I	get system info
+
+    ~0:PL path	ls path
+    ~0:PM path	mkdir path
+    ~0:PR path	rm path
 
     01234
-    ~FR path$	fopen( path, "r" );
-    ~FW path$	fopen( path, "w" );
-    ~FA path$	fopen( path, "a" ); fseek( 0, SEEK_END );
-    ~FW path$	(write as IHX) (future)
+    ~0:FR path	fopen( path, "r" );
+		-0:Nbf=path
+		-0:NS=292929292929292
+		-0:Nef=22
+		-0:N2=OK
+	Nbf begin file
+	Nef end file
+    ~0:FW path	fopen( path, "w" );
+		~0:FW newfile.txt
+		-0:N2=OK
+		~0:FS 292929292929299A23993
+		-0:Nc=03,99
+		~0:FC
+		-0:N2=OK
+    ~0:FC	close
+    ~0:FS	Send string
 
     0123
-    ~SR D S$	read drive D sector S to buffer
-    ~SW D S$	write buffer to drive D sector S
+    ~0:SR D T S	read drive D, Track T, Sector S to buffer
+    ~0:SW D T S	write buffer to drive D, Track T, sector S
+    ~0:SS data	Data from sector read
+    ~0:SC	close sector file
  */
 
 static void MassStorage_ParseLine( char * line )
@@ -278,73 +188,6 @@ static void MassStorage_ParseLine( char * line )
 	int error = 0;
 
 	printf( "EMU: SD: Parse Line: [%s]\n", lineBuf );
-	if( lineBuf[0] == 'Z' && lineBuf[1] == 'Z' && lineBuf[3] == '\0' ) {
-		/* close open write files. */
-		MassStorage_End_File();
-		return;
-	}
-	if( lineBuf[0] != '~' ) {
-		/* invalid */
-		error = 1;
-		return;
-	}
-
-	if( lineBuf[1] == 'I' && lineBuf[2] == '\0' )
-	{
-		printf( "EMU: Got ~I.  Should queue up info.\n" );
-	}
-
-	if(    lineBuf[2] == ' '
-	    && lineBuf[3] != '\0' )
-	{
-		switch( lineBuf[1] ) {
-		case( 'L' ):
-			MassStorage_Start_Listing( lineBuf+3 );
-			break;
-		case( 'M' ):
-			MassStorage_Do_MakeDir( lineBuf+3 );
-			break;
-		case( 'D' ):
-			MassStorage_Do_Remove( lineBuf+3 );
-			break;
-		default:
-			error = 2;
-		}
-	} else if(    lineBuf[3] == ' '
-		   && lineBuf[1] == 'S'
-		   && lineBuf[4] != '\0' )
-	{
-		/* Sector operations */
-		switch( lineBuf[2] ) {
-		case( 'R' ):
-			MassStorage_Start_Sector_Read( lineBuf+4 );
-			break;
-		case( 'W' ):
-			MassStorage_Start_Sector_Write( lineBuf+4 );
-			break;
-		}
-	} else if(    lineBuf[3] == ' '
-		   && lineBuf[1] == 'F'
-		   && lineBuf[4] != '\0' )
-	{
-		/* file operations */
-		switch( lineBuf[2] ) {
-		case( 'R' ):
-			MassStorage_Start_Read( lineBuf+4 );
-			break;
-		case( 'W' ):
-			MassStorage_Start_Write( lineBuf+4 );
-			break;
-		case( 'A' ):
-			MassStorage_Start_Append( lineBuf+4 );
-			break;
-		default:
-			error = 3;
-		}
-	}
-	else {
-		error = 4;
-	}
 
 	if( error != 0 ) {
 		printf( "EMU: SD: Error %d with [%s]\n", error, lineBuf );

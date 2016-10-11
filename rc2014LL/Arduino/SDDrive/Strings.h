@@ -2,6 +2,8 @@
 /* Version info
  *  
  *  v004 : 2016-10-09
+ *         cat/send file fails if it tries to send a directory
+ *         'c' and 'l' shortcut commands added for debugging
  *  
  *  v003 : 2016-10-08  yorgle@gmail.com
  *         Multiple serial device support added (-0:)

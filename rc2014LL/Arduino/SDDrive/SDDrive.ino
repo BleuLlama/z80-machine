@@ -13,10 +13,14 @@
 #include "PinConfig.h"
 #include "Strings.h"
 
+#define INCLUDE_DEBUG_COMMANDS
+
 ////////////////////////////////////////////
 
 class BufSerial ser;
+#ifdef INCLUDE_DEBUG_COMMANDS
 char echo = 1;
+#endif
 
 ////////////////////////////////////////////
 
@@ -115,6 +119,9 @@ void serialInit()
 #define kMaxBuf (128)
 char buf[ kMaxBuf ] = { '\0' };
 
+#define CLEAR_BUFFER() \
+  memset( buf, '\0', kMaxBuf );
+
 ////////////////////////////////////////////
 
 /* cheat sheet
@@ -178,12 +185,21 @@ void do_FileRead( const char * path )
     return;
   }
 
+  if( myFile.isDirectory() )
+  {
+    cmd_fail();
+    ledEmoteOk();
+    myFile.close();
+    return;
+  }
+
   /* get filesize */
   unsigned long sz = myFile.size();
 
   /* output the header */
   ser.print( kStr_Prot0 );
-  ser.println( kStr_Begin );
+  ser.print( kStr_Begin );
+  ser.println( path );
   
   while( myFile.available() ) 
   {
@@ -224,22 +240,87 @@ void do_FileRead( const char * path )
   ledEmoteOk();
 }
 
+#ifdef INCLUDE_DEBUG_COMMANDS
+void do_cat( const char * fname )
+{
+  /* attempt to open or fail */  
+  File myFile = SD.open( fname );
+  if( !myFile ) {
+    cmd_fail();
+    return;
+  }
+
+  if( myFile.isDirectory() )
+  {
+    cmd_fail();
+    ledEmoteOk();
+    myFile.close();
+    return;
+  }
+
+  while( myFile.available() ) 
+  {
+    int ch = myFile.read();
+    if( ch == '\n' ) {
+      Serial1.println();
+    } else {
+      Serial1.write( ch );
+    }
+  }
+  
+  myFile.close();
+}
+#endif
+
+////////////////////////////////
+// file write
+
+File writeFile;
+bool writing = false;
+
+
+void do_FileClose( void )
+{
+  if( !writing ) return;
+  
+  writeFile.close();
+  writing = false;
+  ledEmoteOk();
+}
+
+
 void do_FileWriteString( const char * string )
 {
   ser.print( "write string " );
   ser.println( string );
-}
 
-void do_FileOpenAppend( const char * path )
-{
-  ser.print( "Open for append " );
-  ser.println( path );
+  if( !writing ) {
+    ser.print( kStr_Prot0 );
+    ser.println( kStr_Error_NoFileWrite );
+    return;
+  }
+
 }
 
 void do_FileOpenWrite( const char * path  )
 {
   ser.print( "Open for write " );
   ser.println( path );
+  
+  if( writing ) do_FileClose();   // close any open file
+
+  // SD.remove( string ); // to clear it out first (write vs append)
+  
+  writeFile = SD.open( path, FILE_WRITE );
+  if( !writeFile ) {
+    ser.print( kStr_Prot0 );
+    ser.println( kStr_Error_FileNotWR );
+    ledEmoteOk();
+    return;
+  }
+
+  ledEmoteWrite();
+  writing = true;  
 }
 
 
@@ -276,12 +357,6 @@ void processFCommands( const char * line )
       ser.print( "Open for Write " );
       ser.println( line+2 );
       break;
-      
-    case( 'A' ):
-      do_FileOpenAppend( line+2 );
-      ser.print( "Open for Append " );
-      ser.println( line+2 );
-      break;
 
     case( 'S' ):
       do_FileWriteString( line+2 );
@@ -300,16 +375,24 @@ void processFCommands( const char * line )
 // P-Commands
 //  path-based stuff
 
-void do_ls( const char * line )
+void do_ls( const char * path )
 {
   File ppp;
   int nFiles = 0;
   int nSubdirs = 0;
+
+  // clean it up, if we got no parameter, set it to "/"
+  if( *path == '\0' ) {
+    char * x = (char *) path; // HACK!
+    x[0] = '/';
+    x[1] = '\0';
+  }
   
   ser.print( kStr_Prot0 );
-  ser.println( kStr_Begin );
+  ser.print( kStr_Begin );
+  ser.println( path );
 
-  ppp = SD.open( line );
+  ppp = SD.open( path );
   ppp.seek( 0 );
   
   while(true) { 
@@ -403,26 +486,29 @@ void processSCommands( const char * line )
 
 
 ////////////////////////////////////////////
-// L-commands1211111111111111111111111111111111111111111111111111111111113rdcx
-//  undocumented, set the board LEDs for debugging
-
-void processLCommands( const char * line )
-{
-  if( *line == 'r' ) { ledSet( kRed, 0 ); }
-  if( *line == 'y' ) { ledSet( kYellow, 0 ); }
-  if( *line == 'g' ) { ledSet( kGreen, 0 ); }
-  if( *line == '0' ) { ledSet( kOff, 0 ); }
-  if( *line == '1' ) { ledSet( kAll, 0 ); }
-}
-
-
-////////////////////////////////////////////
 
 void processLine( void )
 {
+#ifdef INCLUDE_DEBUG_COMMANDS
+  /* some shortcuts for testing */
+  if( buf[0] == 'c' ) {
+    /* cat a file */
+    do_cat( buf+2 );
+    CLEAR_BUFFER();
+    return;
+  }
+
+  if( buf[0] == 'l' ) {
+    /* list a directory */
+    do_ls( buf+2 );
+    CLEAR_BUFFER();
+    return;
+  }
+#endif
+
   if( buf[0] == '\0' ) {
     // absorb empty lines
-    buf[0] = '\0';
+    CLEAR_BUFFER();
     return;
   }
 
@@ -430,7 +516,7 @@ void processLine( void )
     // It's a response from another node. Let's inc the id and send it through
     buf[1]++;
     ser.println( buf );
-    buf[0] = '\0';
+    CLEAR_BUFFER();
     return;
   }
 
@@ -439,7 +525,7 @@ void processLine( void )
     // It's a command for another node.  Let's dec the id and send it through...
     buf[1]--;
     ser.println( buf );
-    buf[0] = '\0';
+    CLEAR_BUFFER();
     return;
   }
   
@@ -450,29 +536,30 @@ void processLine( void )
     ser.print( kStr_Prot0 );
     ser.print( kStr_Error_LEcho );
     ser.println( buf );
-    buf[0] = '\0';
+    CLEAR_BUFFER();
     return;
   }
 
   // ok. let's hand off control to the appropriate processor
   switch( buf[3] ) {
+#ifdef INCLUDE_DEBUG_COMMANDS
     case( 'e' ):
       // toggle echo
       echo ^= 1;
       break;
+#endif
       
     case( 'I' ): sendSDInfo(); break;
     
     case( 'F' ): processFCommands( &buf[4] ); break;
     case( 'P' ): processPCommands( &buf[4] ); break;
-    case( 'S' ): processSCommands( &buf[4] ); break;
-    case( 'L' ): processLCommands( &buf[4] ); break;
+    case( 'S' ): processSCommands( &buf[4] ); break;\
     default:
       break;
   }
 
   // and clear the line
-  buf[0] = '\0';
+  CLEAR_BUFFER();
 }
 
 void serialPoll( void )
@@ -481,11 +568,12 @@ void serialPoll( void )
   
   if( ser.available() ) {
     char ch = ser.read();
-
+#ifdef INCLUDE_DEBUG_COMMANDS
     if( echo ) {
       if( ch == '\n' || ch=='\r' ) ser.println();
       else ser.write( ch );
     }
+#endif
 
     l = strlen( buf );
     if( ch == '\n' || ch == '\r' || l >= (kMaxBuf-1) ) {

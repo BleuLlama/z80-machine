@@ -98,7 +98,7 @@ memnext:
 
 
 str_ram: .asciz	"RAM"
-str_rom: .asciz	"ROM"
+str_rom: .asciz	"    ROM"
 str_opn: .asciz	"-"
 
 str_memheader:

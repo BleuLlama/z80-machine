@@ -16,10 +16,26 @@ int ledMask = 0;
 unsigned long ledTick = 0;
 int ledCount = 0;
 int ledSpeed = 0;
+bool ledFixed = false;
+
+void ledSolid( int mask, int value )
+{
+  ledFixed = true;
+  
+  digitalWrite( kPinLEDGreen, HIGH );
+  digitalWrite( kPinLEDYellow, HIGH );
+  digitalWrite( kPinLEDRed, HIGH );
+  
+  if( mask & kRed )    analogWrite( kPinLEDRed, value );
+  if( mask & kYellow ) analogWrite( kPinLEDYellow, value );
+  if( mask & kGreen )  analogWrite( kPinLEDGreen, value );
+}
 
 /* poll the LED updater */
 void ledPoll( void )
 {
+  if( ledFixed == true ) return;
+  
   unsigned char aValue;  
   if( millis() > ledTick ) {
     ledCount++;
@@ -30,13 +46,13 @@ void ledPoll( void )
     else  aValue = 512 - ledCount;
 
     aValue = 256 - aValue; /* reverse since they're sunk not sourced */
-
-    if( ledMask & kRed ) analogWrite( kPinLEDRed, aValue );
-    if( ledMask & kYellow ) analogWrite( kPinLEDYellow, aValue );
-    if( ledMask & kGreen ) analogWrite( kPinLEDGreen, aValue );
     
+    if( ledMask & kRed )    analogWrite( kPinLEDRed, aValue );
+    if( ledMask & kYellow ) analogWrite( kPinLEDYellow, aValue );
+    if( ledMask & kGreen )  analogWrite( kPinLEDGreen, aValue );
   }
 }
+
 
 /* delay for milliseconds, while polling the LEDs */
 void ledDelay( long ms )
@@ -52,6 +68,7 @@ void ledDelay( long ms )
 /* set the mask for the LED indicators */
 void ledSet( int mask, int spd )
 {
+  ledFixed = false;
   ledSpeed = spd;
   
   if( mask == ledMask && spd == ledSpeed ) return;
@@ -79,12 +96,12 @@ void ledEmoteError()
 
 void ledEmoteRead()
 {
-  ledSet( kGreen, 9999 );
+  ledSolid( kGreen, 0 );
 }
 
 void ledEmoteWrite()
 {
-  ledSet( kRed, 9999 );
+  ledSolid( kRed, 0 );
 }
 
 
