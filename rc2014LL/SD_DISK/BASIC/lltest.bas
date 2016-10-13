@@ -3,7 +3,6 @@
 30 REM  'RUN 1000' to copy ROM to RAM and switch to RAM
 40 REM  Full test:  'RUN'  'RUN 1000'  'RUN'
 
-
 100 REM == Check memory chunks ==
 110 FOR M=0 TO 63 STEP 8
 120 R = M * 1024
