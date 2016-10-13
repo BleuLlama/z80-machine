@@ -18,41 +18,122 @@
 
 /* ********************************************************************** */
 
-/* See the Arduino implementation and document for the full design
+/* See the Arduino implementation and document for the full protocol
  */
 
-/* Meta State */
-#define kMS_ReadLine		(0) /* reading, idle */
-#define kMS_Writing		(1)
+/*
+   NOTE: that we can't use the exact same code in here since over
+   there, we're basically multiprocessing, so the arduino can sit
+   in a tight loop, waiting for new bytes, whereas here, we need
+   to prepare a few at a time (or one at a time) and then send that
+   and then relinquish control back to the core engine.
+*/
 
-static int metaState	= kMS_ReadLine;
-static int moreToRead	= 0;
+typedef enum {
+    kMS_fileClosed = 0,
+    kMS_fileRead,
+    kMS_fileWrite
+} MS_FileState;
+
+static FILE * ms_ioFile = NULL;
+static MS_FileState ms_fileState = kMS_fileClosed;
+
+#define kMS_BufSize  (128)
+static char ms_ByteBuffer[kMS_BufSize];
+static int nibMask = 0;
+static int bufPtr = -1;
+
+int MS_QueueAvailable( void )
+{
+    if( bufPtr > 0 ) return 1;
+    return 0;
+}
+
+/* Send bytes TO the Z80 */
+int MS_QueueByte( char b )
+{
+    if( bufPtr >= kMS_BufSize ) return 0;
+
+    bufPtr++;
+    ms_ByteBuffer[ bufPtr ] = b;
+
+    return 1;
+}
+
+void MS_QueueStr( const char * s )
+{
+    if( !s ) return;
+
+    while( *s ) {
+	MS_QueueByte( *s );
+	s++;
+    }
+}
+
+//void MS_QueueDataHex( const unsigned char * data, int nBytes
+
+/* not really "pop" but more of a dequeue */
+char MS_QueuePop( void )
+{
+    char retval = 0x00;
+    int x;
+
+    /* if there's nothing, return 0 */
+    if( bufPtr >= 0 ) {
+	/* stash the return byte aside */
+	retval = ms_ByteBuffer[0];
+
+	/* shift them all down */
+	for( x=0 ; x< kMS_BufSize-1 ; x++ )
+	{
+	    ms_ByteBuffer[x] = ms_ByteBuffer[x+1];
+	}
+	bufPtr--;
+    }
+
+    return retval;
+}
+
+void MS_QueueDebug( void )
+{
+    int x;
+    printf( "QUEUE: [\n" );
+    for( x = 0 ; x < kMS_BufSize ; x++ ) {
+	printf( "%c", ms_ByteBuffer[ x ] );
+    }
+
+    printf( "\n]\n" );
+}
+
 
 
 #define kMaxLine (255)
 static char lineBuf[kMaxLine];
+
+void MassStorage_ClearLine()
+{
+    int x;
+
+    for( x=0 ; x<kMaxLine ; x++ ) lineBuf[x] = '\0';
+}
 
 /* MassStorage_Init
  *   Initialize the SD simulator
  */
 void MassStorage_Init( void )
 {
-	/* start out reading an input line... */
-	metaState = kMS_ReadLine;
-	lineBuf[0] = '\0';
-	moreToRead = 0;
+    MassStorage_ClearLine();
 }
 
 
 static char val2ascii( int val )
 {
-	const char *hexit = "0123456789ABCDEF";
-	val = val & 0x0F;
-	return hexit[val];
+    const char *hexit = "0123456789ABCDEF";
+    val = val & 0x0F;
+    return hexit[val];
 }
 
-FILE * fp = NULL;
-
+/* ********************************************************************** */
 
 /* MassStorage_RX
  *   handle the simulation of the SD module sending stuff
@@ -60,7 +141,7 @@ FILE * fp = NULL;
  */
 byte MassStorage_RX( void )
 {
-	return 0xff;
+    return MS_QueuePop();
 }
 
 /* ********************************************************************** */
@@ -69,6 +150,9 @@ byte MassStorage_RX( void )
 
 static void MassStorage_Start_Listing( char * path )
 {
+	if( *path == '\0' ) {
+	    *path = '/';
+	}
 	printf( "EMU: SD: ls [%s]\n", path );
 }
 
@@ -94,15 +178,19 @@ static void MassStorage_Do_Remove( char * path )
 	unlink( pathbuf );
 }
 
+/* **********************************************************************
+ * Files
+ */
 
-static void MassStorage_Start_Read( char * path )
+static void MassStorage_File_Start_Read( char * path )
 {
 	char pathbuf[255];
 	sprintf( pathbuf, "%s%s", kSD_Path, path );
 
 	printf( "EMU: SD: Read from [%s]\n", path ); 
 
-	if( fp ) fclose( fp );
+	//if( fp ) fclose( fp );
+#ifdef NEVER
 
 	fp = fopen( pathbuf, "r" );
 	if( fp == NULL ) {
@@ -110,41 +198,63 @@ static void MassStorage_Start_Read( char * path )
 		printf( "EMU: SD: Can't open %s\n", pathbuf );
 		return;
 	}
+#endif
 }
 
 
-static void MassStorage_Start_Write( char * path )
+static void MassStorage_File_Start_Write( char * path )
 {
 	printf( "EMU: SD: Write to [%s]\n", path ); 
 	printf( "EMU: SD: unavailable\n" );
 }
 
-static void MassStorage_Start_Append( char * path )
+static void MassStorage_File_ConsumeString( char * data )
 {
-	printf( "EMU: SD: Append to [%s]\n", path ); 
-	printf( "EMU: SD: unavailable\n" );
+	printf( "EMU: SD: consume data [%s]\n", data ); 
 }
 
+static void MassStorage_File_Close( void )
+{
+	printf( "EMU: SD: end file.\n" );
+#ifdef NEVER
+	if( fp != NULL ) {
+		fclose( fp );
+		fp = NULL;
+	}
+#endif
+}
 
-static void MassStorage_Start_Sector_Read( char * args )
+/* **********************************************************************
+ * Sectors
+ */
+
+
+static void MassStorage_Sector_Start_Read( char * args )
 {
 	printf( "EMU: SD: Read Sector [%s]\n", args ); 
 	printf( "EMU: SD: unavailable\n" );
 }
 
-static void MassStorage_Start_Sector_Write( char * args )
+static void MassStorage_Sector_Start_Write( char * args )
 {
 	printf( "EMU: SD: Write Sector [%s]\n", args ); 
 	printf( "EMU: SD: unavailable\n" );
 }
 
-static void MassStorage_End_File( void )
+static void MassStorage_Sector_ConsumeString( char * data )
+{
+	printf( "EMU: SD: consume data [%s]\n", data ); 
+}
+
+static void MassStorage_Sector_Close( void )
 {
 	printf( "EMU: SD: end file.\n" );
+#ifdef NEVER
 	if( fp != NULL ) {
 		fclose( fp );
 		fp = NULL;
 	}
+#endif
 }
 
 
@@ -185,13 +295,109 @@ static void MassStorage_End_File( void )
 
 static void MassStorage_ParseLine( char * line )
 {
-	int error = 0;
+    int error = 0;
 
-	printf( "EMU: SD: Parse Line: [%s]\n", lineBuf );
+    /* output some indication of an empty line, but keep things quiet. */
+    if( *line == '\0' ) {
+	printf( " " );
+	fflush( stdout );
+	return;
+    }
 
-	if( error != 0 ) {
-		printf( "EMU: SD: Error %d with [%s]\n", error, lineBuf );
+    printf( "EMU: SD: Parse Line: [%s]\n", lineBuf );
+
+
+    if( line[0] == '~' && line[1] == '0' && line[2] == ':' ) {
+	switch( line[3] ) {
+	case( 'I' ):
+	    /* Info command */
+	    MS_QueueStr( "-0:N1=Card OK\n" );
+	    MS_QueueStr( "-0:Nt=EMU64\n" );
+	    MS_QueueStr( "-0:Ns=128,meg\n" );
+	    break;
+
+	/* Path operations */
+	case( 'P' ):
+	    switch( line[4] ) {
+	    case( 'L' ): /* ls */
+		MassStorage_Start_Listing( line+6 );
+		break;
+
+	    case( 'M' ): /* mkdir */
+		MassStorage_Do_MakeDir( line+6 );
+		break;
+
+	    case( 'R' ): /* rm */
+		MassStorage_Do_Remove( line+6 );
+		break;
+
+	    default:
+		break;
+	    }
+	    break;
+
+	/* File operations */
+	case( 'F' ):
+	    switch( line[4] ) {
+	    case( 'R' ):
+		MassStorage_File_Start_Read( line+6 );
+		break;
+
+	    case( 'W' ):
+		MassStorage_File_Start_Write( line+6 );
+		break;
+
+	    case( 'S' ):
+		MassStorage_File_ConsumeString( line+6 );
+		break;
+
+	    case( 'C' ):
+		MassStorage_File_Close();
+		break;
+
+	    default:
+		break;
+	    }
+	    break;
+
+	/* Sector operations */
+	case( 'S' ):
+	    switch( line[4] ) {
+	    case( 'R' ):
+		MassStorage_Sector_Start_Read( line+6 );
+		break;
+
+	    case( 'W' ):
+		MassStorage_Sector_Start_Write( line+6 );
+		break;
+
+	    case( 'S' ):
+		MassStorage_Sector_ConsumeString( line+6 );
+		break;
+
+	    case( 'C' ):
+		MassStorage_Sector_Close();
+		break;
+
+	    default:
+		break;
+	    }
+	    break;
+
+	default:
+	    error = 6;
+	    MS_QueueStr( "-0:E6=No.\n" );
+	    break;
 	}
+    } else {
+	error = 3;
+	MS_QueueStr( "-0:E3=No.\n" );
+    }
+
+    if( error != 0 ) {
+	printf( "EMU: SD: Error %d with [%s]\n", error, lineBuf );
+    }
+    /* MS_QueueDebug(); */
 }
 
 
@@ -201,21 +407,23 @@ static void MassStorage_ParseLine( char * line )
  */
 void MassStorage_TX( byte ch )
 {
-	char lba[2] = { '\0', '\0' };
+    char lba[2] = { '\0', '\0' };
 
-	/* printf( "EMU: SD: read 0x%02x\n\r", ch ); */
+    /* printf( "EMU: SD: read 0x%02x\n\r", ch ); */
 
-	if( ch == '\r' || ch == '\n' || ch == '\0' )
-	{
-		// end of string
-		MassStorage_ParseLine( lineBuf );
-		lineBuf[0] = '\0';
-	}
-	else if( strlen( lineBuf ) < (kMaxLine-1) )
-	{
-		lba[0] = ch;
-		strcat( lineBuf, lba );
-	}
+    if( ch == '\r' || ch == '\n' || ch == '\0' )
+    {
+	// end of string
+	MassStorage_ParseLine( lineBuf );
+	lineBuf[0] = '\0';
+	MassStorage_ClearLine();
+    }
+
+    else if( strlen( lineBuf ) < (kMaxLine-1) )
+    {
+	lba[0] = ch;
+	strcat( lineBuf, lba );
+    }
 }
 
 
@@ -226,7 +434,7 @@ byte MassStorage_Status( void )
 {
 	byte sts = 0x00;
 
-	if( moreToRead ) {
+	if( bufPtr >= 0 ) {
 		sts |= kPRS_RxDataReady; /* data is available to read */
 	}
 

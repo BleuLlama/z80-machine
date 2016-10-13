@@ -81,42 +81,61 @@ TerminalApp:
 	ld	hl, #str_intro
 	call	Print
 
-	; check for input from either port
+	ld 	a, #'~
+	out	(SDData),a
+	ld 	a, #'0
+	out	(SDData),a
+	ld 	a, #':
+	out	(SDData),a
+	ld 	a, #'I
+	out	(SDData),a
+	ld 	a, #0x0d
+	out	(SDData),a
+	ld 	a, #0x0a
+	out	(SDData),a
 
+
+	; the main loop
+	; check for input from either port
+	; and send it to the other port  ))<>((
 TermLoop:
-	call	KbHit
-	call	z, TermToSD	; something outgoing... send it!
+	call	SDToTerm	; send stuff to the temrinal
+	call	TermToSD	; Send stuff from the terminal
 
 	cp	#'`		; if A is backtick, we can return
-	jr	z, TermExit	; we're done!
+	jr	nz, TermLoop	; nope.  do it again!
 
-	in	a, (SDStatus)
-	and	#DataReady	; mask off the "data is ready bit
-	call	z, SDToTerm	; something incoming... get a byte
-
-	jr	TermLoop
-
-
+	; if user types backtick, return.
 TermExit:
 	ld	hl, #str_outro
 	call	Print
 	xor	a
 	ret
 
-TermToSD:
-	call	GetCh
-	;push	af
-	;call	printByte
-	;call	PrintNL
-	;pop	af
-	;cp	#'`		; exit character
-	;jr	z, TermExit	; yep! Exit!
 
-	out	(SDData), a	; send the byte out to the SD interface
-	;ld	a, #0xFF
+	; check for user Terminal input
+	; send it to the SD drive
+TermToSD:
+	in      a, (TermStatus) ; ready to read a byte?
+	and     #DataReady      ; see if a byte is available
+
+	jr	z, RetWith0
+	in      a, (TermData)   ; get it!
+
+	out	(SDData), a	; a has the byte we sent
+	ret
+RetWith0:
+	xor	a
 	ret
 
+
+	; check for SD drive output
+	; send it to the user Terminal
 SDToTerm:
+	in	a, (SDStatus)
+	and	#DataReady	; mask off the "data is ready bit
+	;ret	nz		; nope. return.
+
 	in	a, (SDData)	; get a byte from the SD interface
 	;push	af
 	;call	printByte

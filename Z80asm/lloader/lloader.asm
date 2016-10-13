@@ -341,6 +341,7 @@ MR_prompt:
 str_menuF: 
 	.ascii  "== Files ==\r\n"
 	.ascii  "  [D] directory listing\r\n"
+	.ascii	"  [I] SD info\r\n"
 	.ascii  "  [R] SD:readme.txt\r\n"
 	.ascii	"  [X] exit this menu\r\n"
 	.byte	0x00
@@ -375,6 +376,9 @@ MF_prompt:
 
 	cp	#'R
 	call	z, catFile
+
+	cp	#'I
+	call	z, sdInfo
 
 	jr	MF_prompt
 
@@ -643,10 +647,17 @@ directoryList:
 	jr	catSDPort	; pretend it's a cat'd file!
 
 
+sdInfo:
+	ld	hl, #cmd_info
+	call	SendSDCommand
+	jr	catSDPort
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Text strings
 
 ; Version history
+;   v010 2016-10-12 - Working on Terminal, added ~I
 ;   v009 2016-10-11 - Internal support for hex, new SD interface
 ;   v008 2016-09-28 - Terminal fixed, new file io command strings
 ;   v007 2016-07-14 - Menu rearrange, better Hexdump
@@ -659,7 +670,7 @@ directoryList:
 
 str_splash:
 	.ascii	"Lloader Shell for RC2014/LL MicroLlama\r\n"
-	.ascii	"  v009 2016-Oct-11  Scott Lawrence\r\n"
+	.ascii	"  v010 2016-Oct-12  Scott Lawrence\r\n"
 	.asciz  "\r\n"
 	
 cmd_getinfo:
@@ -688,6 +699,9 @@ str_line:
 
 cmd_directory:
 	.asciz	"~0:PL \n"
+
+cmd_info:
+	.asciz	"~0:I\n"
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
