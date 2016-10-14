@@ -197,7 +197,7 @@ and by letter.
 	    -0:Nbf=BASIC
 	    -0:LLTEST.BAS,963
 	    -0:USRTEST.BAS,4571
-	    -0:Nef=2
+	    -0:Nef=2,0
 
 	Similar to "dir" or "ls"
 

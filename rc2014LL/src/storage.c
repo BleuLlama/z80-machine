@@ -6,6 +6,7 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>	/* malloc */
 #include <sys/types.h>
 #include <sys/stat.h>	/* for mkdir */
 #include <unistd.h>	/* for rmdir, unlink */
@@ -38,10 +39,11 @@ typedef enum {
 static FILE * ms_ioFile = NULL;
 static MS_FileState ms_fileState = kMS_fileClosed;
 
-#define kMS_BufSize  (128)
-static char ms_ByteBuffer[kMS_BufSize];
+#define kMS_BufSize  (1024 * 1024 * 1)
+static char * ms_ByteBuffer = NULL;
 static int nibMask = 0;
 static int bufPtr = -1;
+
 
 int MS_QueueAvailable( void )
 {
@@ -122,6 +124,14 @@ void MassStorage_ClearLine()
  */
 void MassStorage_Init( void )
 {
+    ms_ByteBuffer = (char *) malloc( kMS_BufSize * sizeof( char ) );
+    if( ms_ByteBuffer ) {
+	printf( "Mass Storage simulation initialized with %d kBytes\n",
+		kMS_BufSize / 1024 );
+    } else {
+	printf( "ERROR: Mass Storage couldn't allocate %d kBytes\n",
+		kMS_BufSize / 1024 );
+    }
     MassStorage_ClearLine();
 }
 
@@ -150,10 +160,71 @@ byte MassStorage_RX( void )
 
 static void MassStorage_Start_Listing( char * path )
 {
-	if( *path == '\0' ) {
-	    *path = '/';
+    char pathbuf[255];
+
+    struct stat status;
+    struct dirent *theDirEnt;
+    DIR * theDir = NULL;
+    int nFiles = 0;
+    int nDirs = 0;
+
+    /* build the path */
+    sprintf( pathbuf, "%s%s", kSD_Path, path );
+
+    printf( "EMU: SD: ls [%s]\n", pathbuf );
+
+    /* open the directory */
+    theDir = opendir( pathbuf );
+
+    if( !theDir ) {
+	MS_QueueStr( "-0:E6=No.\n" );
+	return;
+    }
+
+    /* header */
+    MS_QueueStr( "-0:Nbf=" );
+    MS_QueueStr( path );
+    MS_QueueStr( "\n" );
+    
+    /* read the first one */
+    theDirEnt = readdir( theDir );
+    while( theDirEnt ) {
+	int skip = 0;
+
+	/* always skip dotpaths */
+	if( !strcmp( theDirEnt->d_name, "." )) skip = 1;
+	if( !strcmp( theDirEnt->d_name, ".." )) skip = 1;
+
+	if( !skip ) {
+	    /* determine if file or dir */
+	    sprintf( pathbuf, "%s%s/%s", kSD_Path, path, theDirEnt->d_name );
+	    stat( pathbuf, &status );
+
+	    /* output the correct line */
+	    if( status.st_mode & S_IFDIR ) {
+		sprintf( pathbuf, "-0:%s/\n",
+			theDirEnt->d_name );
+		MS_QueueStr( pathbuf );
+		nDirs++;
+	    } else {
+		sprintf( pathbuf, "-0:%s,%ld\n",
+			theDirEnt->d_name, (long)status.st_size );
+		MS_QueueStr( pathbuf );
+		nFiles++;
+	    }
+
 	}
-	printf( "EMU: SD: ls [%s]\n", path );
+
+
+	/* get the next one */
+	theDirEnt = readdir( theDir );
+    }
+    closedir( theDir );
+
+    /* footer */
+    /* let's re-use pathbuf just because */
+    sprintf( pathbuf, "-0:Nef=%d,%d\n", nFiles, nDirs );
+    MS_QueueStr( pathbuf );
 }
 
 static void MassStorage_Do_MakeDir( char * path )

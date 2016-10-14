@@ -638,13 +638,6 @@ CFRet:
 
 	xor	a
 	ret
-	
-
-
-directoryList:
-	ld	hl, #cmd_directory
-	call	SendSDCommand
-	jr	catSDPort	; pretend it's a cat'd file!
 
 
 sdInfo:
@@ -653,11 +646,48 @@ sdInfo:
 	jr	catSDPort
 
 
+directoryList:
+	ld	hl, #cmd_directory
+	call	SendSDCommand
+
+	ld	hl, #str_line
+	call	Print
+
+DL0:
+	; check for more bytes
+	in	a, (SDStatus)
+	and	#DataReady	; more bytes to read?
+	jr	z, DLRet 	; nope. exit out
+	
+	; load a byte from the file, print it out
+	in	a, (SDData)	; get the file data byte
+	cp	#0x00		; received null...
+	call	z, DLNull	; nulls become newlines for dir listings
+	out	(TermData), a	; send it out.
+	;ld	(hl), a		; store it out
+
+	inc	hl		; next position
+	jr	CF0		; repeat
+
+DLNull:
+	push	hl
+	call	PrintNL
+	pop	hl
+	ret
+
+DLRet:
+	ld	hl, #str_line
+	call	Print
+
+	xor	a
+	ret
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Text strings
 
 ; Version history
-;   v010 2016-10-12 - Working on Terminal, added ~I
+;   v010 2016-10-13 - Working on Terminal, added ~I, Directory
 ;   v009 2016-10-11 - Internal support for hex, new SD interface
 ;   v008 2016-09-28 - Terminal fixed, new file io command strings
 ;   v007 2016-07-14 - Menu rearrange, better Hexdump
@@ -670,23 +700,23 @@ sdInfo:
 
 str_splash:
 	.ascii	"Lloader Shell for RC2014/LL MicroLlama\r\n"
-	.ascii	"  v010 2016-Oct-12  Scott Lawrence\r\n"
+	.ascii	"  v010 2016-Oct-13  Scott Lawrence\r\n"
 	.asciz  "\r\n"
 	
 cmd_getinfo:
-	.asciz  "~0:I\n"
+	.asciz  "\n~0:I\n"
 
 cmd_bootfile:
-	.asciz	"~0:FR ROMs/boot.hex\n"
+	.asciz	"\n~0:FR ROMs/boot.hex\n"
 
 cmd_bootCPM:
-	.asciz	"~0:FR ROMs/cpm.hex\n"
+	.asciz	"\n~0:FR ROMs/cpm.hex\n"
 
 cmd_bootBasic32:
-	.asciz	"~0:FR ROMs/basic32.hex\n"
+	.asciz	"\n~0:FR ROMs/basic32.hex\n"
 
 cmd_bootBasic56:
-	.asciz	"~0:FR ROMs/basic56.hex\n"
+	.asciz	"\n~0:FR ROMs/basic56.hex\n"
 
 str_loaded:
 	.asciz 	"Done loading. Restarting...\n\r"
@@ -698,10 +728,10 @@ str_line:
 	.asciz	"--------------\n\r"
 
 cmd_directory:
-	.asciz	"~0:PL \n"
+	.asciz	"\n~0:PL /\n"
 
 cmd_info:
-	.asciz	"~0:I\n"
+	.asciz	"\n~0:I\n"
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
