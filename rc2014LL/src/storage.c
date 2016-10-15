@@ -30,21 +30,15 @@
    and then relinquish control back to the core engine.
 */
 
-typedef enum {
-    kMS_fileClosed = 0,
-    kMS_fileRead,
-    kMS_fileWrite
-} MS_FileState;
-
-static FILE * ms_ioFile = NULL;
-static MS_FileState ms_fileState = kMS_fileClosed;
-
-#define kMS_BufSize  (1024 * 1024 * 1)
-static char * ms_ByteBuffer = NULL;
-static int nibMask = 0;
+#define kMS_BufSize  (1024 * 1)
+static char * ms_SendQueue = NULL;
 static int bufPtr = -1;
 
 
+/* MS_QueueAvailable
+ *	returns 1 if there's something to be popped from the queue
+ *	returns 0 if the queue is empty
+ */
 int MS_QueueAvailable( void )
 {
     if( bufPtr > 0 ) return 1;
@@ -52,29 +46,56 @@ int MS_QueueAvailable( void )
 }
 
 /* Send bytes TO the Z80 */
+
+/* MS_QueueByte
+ *	pushes the single byte onto the queue
+ *	reutrns 1 if successful, 0 if not
+ */
 int MS_QueueByte( char b )
 {
     if( bufPtr >= kMS_BufSize ) return 0;
 
     bufPtr++;
-    ms_ByteBuffer[ bufPtr ] = b;
+    ms_SendQueue[ bufPtr ] = b;
 
     return 1;
 }
 
-void MS_QueueStr( const char * s )
+/* MS_QueueStr
+ *	takes the string, pushes it onto the queue
+ *	returns the number of bytes pushed
+ */
+int MS_QueueStr( const char * s )
 {
-    if( !s ) return;
+    int nq = 0;
 
-    while( *s ) {
-	MS_QueueByte( *s );
-	s++;
+    if( s ) {
+	while( *s ) {
+	    nq += MS_QueueByte( *s );
+	    s++;
+	}
     }
+    return nq;
 }
 
-//void MS_QueueDataHex( const unsigned char * data, int nBytes
+/* MS_QueueHex
+ *	takes the value, converts it to an ascii string
+ *	then pushes that onto the queue
+ *	returns the number of bytes pushed
+ */
+int MS_QueueHex( unsigned char val )
+{
+    char b[4];
 
-/* not really "pop" but more of a dequeue */
+    sprintf( b, "%02x", val );
+    return MS_QueueStr( b );
+}
+
+
+/* MS_QueuePop
+ *	removes the head char off the queue, shifts the rest
+ *	returns the pulled off character
+ */
 char MS_QueuePop( void )
 {
     char retval = 0x00;
@@ -83,12 +104,12 @@ char MS_QueuePop( void )
     /* if there's nothing, return 0 */
     if( bufPtr >= 0 ) {
 	/* stash the return byte aside */
-	retval = ms_ByteBuffer[0];
+	retval = ms_SendQueue[0];
 
 	/* shift them all down */
 	for( x=0 ; x< kMS_BufSize-1 ; x++ )
 	{
-	    ms_ByteBuffer[x] = ms_ByteBuffer[x+1];
+	    ms_SendQueue[x] = ms_SendQueue[x+1];
 	}
 	bufPtr--;
     }
@@ -96,22 +117,37 @@ char MS_QueuePop( void )
     return retval;
 }
 
+/* MS_QueueSpace
+ *	returns the number of bytes of free space in the queue buffer
+ */
+int MS_QueueSpace( void )
+{
+    return( kMS_BufSize - bufPtr - 2);
+}
+
+/* MS_QueueDebug
+ *	dump out the used space in the Queue to stdout
+ */
 void MS_QueueDebug( void )
 {
     int x;
     printf( "QUEUE: [\n" );
     for( x = 0 ; x < kMS_BufSize ; x++ ) {
-	printf( "%c", ms_ByteBuffer[ x ] );
+	printf( "%c", ms_SendQueue[ x ] );
     }
 
     printf( "\n]\n" );
 }
 
 
+/* ********************************************************************** */
 
 #define kMaxLine (255)
 static char lineBuf[kMaxLine];
 
+/* MassStorage_ClearLine
+ *	clear the entire linebuffer for parsing
+ */
 void MassStorage_ClearLine()
 {
     int x;
@@ -120,12 +156,12 @@ void MassStorage_ClearLine()
 }
 
 /* MassStorage_Init
- *   Initialize the SD simulator
+ *	Initialize the SD simulator
  */
 void MassStorage_Init( void )
 {
-    ms_ByteBuffer = (char *) malloc( kMS_BufSize * sizeof( char ) );
-    if( ms_ByteBuffer ) {
+    ms_SendQueue = (char *) malloc( kMS_BufSize * sizeof( char ) );
+    if( ms_SendQueue ) {
 	printf( "Mass Storage simulation initialized with %d kBytes\n",
 		kMS_BufSize / 1024 );
     } else {
@@ -136,29 +172,16 @@ void MassStorage_Init( void )
 }
 
 
-static char val2ascii( int val )
-{
-    const char *hexit = "0123456789ABCDEF";
-    val = val & 0x0F;
-    return hexit[val];
-}
-
-/* ********************************************************************** */
-
-/* MassStorage_RX
- *   handle the simulation of the SD module sending stuff
- *   (RX on the simulated computer)
- */
-byte MassStorage_RX( void )
-{
-    return MS_QueuePop();
-}
 
 /* ********************************************************************** */
 
 #define kSD_Path 	"SD_DISK/"
 
-static void MassStorage_Start_Listing( char * path )
+/* MassStorage_Do_Listing
+ *	Takes a directory list of the passed-in path
+ *	Queues all of the strings into the queue.
+ */
+static void MassStorage_Do_Listing( char * path )
 {
     char pathbuf[255];
 
@@ -182,7 +205,7 @@ static void MassStorage_Start_Listing( char * path )
     }
 
     /* header */
-    MS_QueueStr( "-0:Nbf=" );
+    MS_QueueStr( "-0:PB=" );
     MS_QueueStr( path );
     MS_QueueStr( "\n" );
     
@@ -223,7 +246,7 @@ static void MassStorage_Start_Listing( char * path )
 
     /* footer */
     /* let's re-use pathbuf just because */
-    sprintf( pathbuf, "-0:Nef=%d,%d\n", nFiles, nDirs );
+    sprintf( pathbuf, "-0:PE=%d,%d\n", nFiles, nDirs );
     MS_QueueStr( pathbuf );
 }
 
@@ -253,23 +276,105 @@ static void MassStorage_Do_Remove( char * path )
  * Files
  */
 
+static FILE * readFile = NULL;
+
+/*
+    start read()
+	1. open the file
+	2. if fail, send error code, done
+	3. queue begin line
+	4. fillCheck()
+	5. return;
+
+    fill check()
+	1. if file closed, return
+	2. While there's space in the queue buffer
+	  2A. Read in the next 16 bytes -> NRead
+	  2B. if read 0 bytes:
+	    2Ba. queue new -0:Fe=(size) line
+	  2C. else
+	    2Ca. queue new -0:FS= line
+
+    status()
+	1. fill check()
+	2. if there's stuff in the buffer, ret=1 else ret=0
+    
+    _rx()
+	1. fill check()
+	2. pop from queue to return
+
+    close()
+	1. close the file, if open
+*/
+
+/* MassStorage_FillCheck
+ *	check to see if the file has more content for the queue
+ */
+static void MassStorage_FillCheck( void )
+{
+#define NPerFill (10)	/* queue buf must be this*2+8+pad minimum */
+
+    char databuf[ (NPerFill * 2) + 2];
+    char strbuf[512];
+    char hexbuf[8];
+    size_t nRead;
+    int j;
+
+    /* no file open, so just return */
+    if( readFile == NULL ) return;
+
+    /* if there's space, push some more...*/
+    if( MS_QueueSpace() > ( (NPerFill*2) + 8 )) {
+	/* read some data */
+	nRead = fread( databuf, 1, NPerFill, readFile );
+
+	if( nRead > 0 ) {
+	    /* make a queue data message */
+	    sprintf( strbuf, "-0:FS=" );
+	    for( j=0 ; j<nRead ; j++ ) {
+		sprintf( hexbuf, "%02x", databuf[j] );
+		strcat( strbuf, hexbuf );
+	    }
+	    strcat( strbuf, "\n" );
+	    MS_QueueStr( strbuf );
+
+	} else {
+	    /* no more data, send the footer */
+	    nRead = (size_t)ftell( readFile ); 
+	    fclose( readFile );
+	    readFile = NULL;
+
+	    /* send the footer */
+	    sprintf( strbuf, "-0:FE=%ld\n", nRead );
+	    MS_QueueStr( strbuf );
+	}
+    }
+}
+
+
 static void MassStorage_File_Start_Read( char * path )
 {
-	char pathbuf[255];
-	sprintf( pathbuf, "%s%s", kSD_Path, path );
+    char pathbuf[255];
 
-	printf( "EMU: SD: Read from [%s]\n", path ); 
+    sprintf( pathbuf, "%s%s", kSD_Path, path );
 
-	//if( fp ) fclose( fp );
-#ifdef NEVER
+    printf( "EMU: SD: Read from [%s]\n", path ); 
 
-	fp = fopen( pathbuf, "r" );
-	if( fp == NULL ) {
-		/* couldn't open file. */
-		printf( "EMU: SD: Can't open %s\n", pathbuf );
-		return;
-	}
-#endif
+    readFile = fopen( pathbuf, "r" );
+    if( readFile == NULL ) {
+	/* couldn't open file. */
+	printf( "EMU: SD: Can't open %s\n", pathbuf );
+	MS_QueueStr( "-0:E9=Not Found.\n" );
+	return;
+    }
+
+    /* start the header... */
+    MS_QueueStr( "-0:FB=" );
+    MS_QueueStr( path );
+    MS_QueueStr( "\n" );
+
+    /* attempt to put some file data into the send queue */
+    MassStorage_FillCheck();
 }
 
 
@@ -332,38 +437,50 @@ static void MassStorage_Sector_Close( void )
 /* ********************************************************************** */
 
 /* cheat sheet
-    0123
-    ~0:I	get system info
+    ~ -> command to SD Drive
+    - -> response from SD Drive
+    ~0:XX=xxx 	with csv parameter(s)
+    ~0:XX	no parameters
 
-    ~0:PL path	ls path
-    ~0:PM path	mkdir path
-    ~0:PR path	rm path
+    [~-]<device>:<type><operation>(=<param>(,<param>)*)
 
     01234
-    ~0:FR path	fopen( path, "r" );
-		-0:Nbf=path
-		-0:NS=292929292929292
-		-0:Nef=22
+    ~0:I	get system info
+
+    ~0:PL=path	ls path
+    ~0:PM=path	mkdir path
+    ~0:PR=path	rm path
+
+    01234
+    ~0:FR=file	fopen( path, "r" );
+		-0:FB=path
+		-0:FS=292929292929292
+		-0:FE=22
 		-0:N2=OK
 	Nbf begin file
 	Nef end file
-    ~0:FW path	fopen( path, "w" );
-		~0:FW newfile.txt
+    ~0:FW=file	fopen( path, "w" );
+		~0:FW=newfile.txt
 		-0:N2=OK
-		~0:FS 292929292929299A23993
+		~0:FS=292929292929299A23993
 		-0:Nc=03,99
 		~0:FC
 		-0:N2=OK
     ~0:FC	close
-    ~0:FS	Send string
+    ~0:FS=data	Send string
 
     0123
-    ~0:SR D T S	read drive D, Track T, Sector S to buffer
-    ~0:SW D T S	write buffer to drive D, Track T, sector S
-    ~0:SS data	Data from sector read
+    ~0:SR=D,T,S	read drive D, Track T, Sector S to buffer
+    ~0:SW=D,T,S	write buffer to drive D, Track T, sector S
     ~0:SC	close sector file
+    ~0:SS=data	Data from sector read
  */
 
+
+/* MassStorage_ParseLine
+ *	Parse the line coming in from the host computer
+ *	Valve it off to the right helper function
+ */
 static void MassStorage_ParseLine( char * line )
 {
     int error = 0;
@@ -391,7 +508,7 @@ static void MassStorage_ParseLine( char * line )
 	case( 'P' ):
 	    switch( line[4] ) {
 	    case( 'L' ): /* ls */
-		MassStorage_Start_Listing( line+6 );
+		MassStorage_Do_Listing( line+6 );
 		break;
 
 	    case( 'M' ): /* mkdir */
@@ -498,22 +615,43 @@ void MassStorage_TX( byte ch )
 }
 
 
+/* ********************************************************************** */
+
+/* MassStorage_RX
+ *   handle the simulation of the SD module sending stuff
+ *   (RX on the simulated computer)
+ */
+byte MassStorage_RX( void )
+{
+    /* see if there's more to go into the queue */
+    MassStorage_FillCheck();
+
+    /* then pop something off (if applicable) */
+    return MS_QueuePop();
+}
+
+
+/* ********************************************************************** */
+
 /* MassStorage_Status
  *   get port status (0x01 if more data)
  */
 byte MassStorage_Status( void )
-{
-	byte sts = 0x00;
+    {
+    byte sts = 0x00;
 
-	if( bufPtr >= 0 ) {
-		sts |= kPRS_RxDataReady; /* data is available to read */
-	}
+    /* see if there's more to go into the queue */
+    MassStorage_FillCheck();
 
-	sts |= kPRS_TXDataEmpty;	/* we're always ready for new stuff */
-	sts |= kPRS_DCD;		/* connected to a carrier */
-	sts |= kPRS_CTS;		/* we're clear to send */
+    if( bufPtr >= 0 ) {
+	sts |= kPRS_RxDataReady; /* data is available to read */
+    }
 
-	return sts;
+    sts |= kPRS_TXDataEmpty;	/* we're always ready for new stuff */
+    sts |= kPRS_DCD;		/* connected to a carrier */
+    sts |= kPRS_CTS;		/* we're clear to send */
+
+    return sts;
 }
 
 
