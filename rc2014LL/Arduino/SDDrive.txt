@@ -457,6 +457,7 @@ Can be separated into fields:
     - record type: 0x00  (Data)
     - data (3 bytes as defined): 0x02, 0x33, 0x7A
     - checksum: Comp2( 0x03 + 0x00 + 0x30 + ... + 0x33 + 0x7A) = 0x1E
+	    Comp2 = (invert all bits, add 1)
 
 Here's an example End of File record:
 

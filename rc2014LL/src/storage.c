@@ -225,12 +225,12 @@ static void MassStorage_Do_Listing( char * path )
 
 	    /* output the correct line */
 	    if( status.st_mode & S_IFDIR ) {
-		sprintf( pathbuf, "-0:%s/\n",
+		sprintf( pathbuf, "-0:PD=%s/\n",
 			theDirEnt->d_name );
 		MS_QueueStr( pathbuf );
 		nDirs++;
 	    } else {
-		sprintf( pathbuf, "-0:%s,%ld\n",
+		sprintf( pathbuf, "-0:PF=%s,%ld\n",
 			theDirEnt->d_name, (long)status.st_size );
 		MS_QueueStr( pathbuf );
 		nFiles++;
@@ -277,6 +277,7 @@ static void MassStorage_Do_Remove( char * path )
  */
 
 static FILE * readFile = NULL;
+static FILE * writeFile = NULL;
 
 /*
     start read()
@@ -355,12 +356,14 @@ static void MassStorage_FillCheck( void )
 static void MassStorage_File_Start_Read( char * path )
 {
     char pathbuf[255];
-
     sprintf( pathbuf, "%s%s", kSD_Path, path );
 
     printf( "EMU: SD: Read from [%s]\n", path ); 
 
-    readFile = fopen( pathbuf, "r" );
+    if( readFile ) {
+	fclose( readFile );
+    }
+    readFile = fopen( pathbuf, "rb" );
     if( readFile == NULL ) {
 	/* couldn't open file. */
 	printf( "EMU: SD: Can't open %s\n", pathbuf );
@@ -380,24 +383,108 @@ static void MassStorage_File_Start_Read( char * path )
 
 static void MassStorage_File_Start_Write( char * path )
 {
-	printf( "EMU: SD: Write to [%s]\n", path ); 
-	printf( "EMU: SD: unavailable\n" );
+    char pathbuf[255];
+    sprintf( pathbuf, "%s%s", kSD_Path, path );
+
+    printf( "EMU: SD: Write to [%s]\n", path ); 
+
+    if( writeFile ) {
+	fclose( writeFile );
+    }
+    writeFile = fopen( pathbuf, "wb" );
+    if( writeFile == NULL ) {
+	/* couldn't open file. */
+	printf( "EMU: SD: Can't open %s\n", pathbuf );
+	MS_QueueStr( "-0:E8=Couldn't write.\n" );
+	return;
+    }
+
+    /* do stuff for write catching */
+}
+
+int IsHex( const char ch )
+{
+    if( ch >= '0' && ch <= '9' ) return 1;
+    if( ch >= 'a' && ch <= 'f' ) return 1;
+    if( ch >= 'A' && ch <= 'F' ) return 1;
+    return 0;
+}
+
+int HexToVal( const char ch )
+{
+    if( ch >= '0' && ch <= '9' ) return( ch-'0' );
+    if( ch >= 'a' && ch <= 'f' ) return( ch-'a'+10 );
+    if( ch >= 'A' && ch <= 'F' ) return( ch-'A'+10 );
+    return 0;
 }
 
 static void MassStorage_File_ConsumeString( char * data )
 {
-	printf( "EMU: SD: consume data [%s]\n", data ); 
+    char buf[64];
+    printf( "EMU: SD: consume data [%s]\n", data ); 
+
+    if( writeFile == NULL || data == NULL ) {
+	MS_QueueStr( "-0:E8=Couldn't write:No file\n" );
+	return;
+    }
+
+    if( strlen( data ) < 1 ) {
+	MS_QueueStr( "-0:E8=Couldn't write:No data\n" );
+	return;
+    }
+
+    /* scan the string */
+
+    unsigned char val = 0;
+    unsigned char nNibs = 0;
+    int nBytes = 0;
+    int sum = 0;
+
+    /* find all alphanum */
+    while( *data != '\0' ) {
+	if( IsHex( *data )) {
+	    if( nNibs == 0 ) {
+		/* build the byte */
+		val = HexToVal( *data )<<4;
+		nNibs = 1;
+	    } else {
+		/* finish the byte */
+		val = (val & 0xF0) | HexToVal( *data );
+		nNibs = 0;
+
+		/* hand it off to the file */
+		fwrite( &val, 1, 1, writeFile );
+		fflush( writeFile );
+
+		/* statistics */
+		sum += val;
+		nBytes++;
+	    }
+	}
+
+	/* Next byte in from the user */
+	data++;
+    }
+
+    sprintf( buf, "-0:Nc=%02x,%02x\n", nBytes, 
+		(unsigned char)(((~sum)+1) &0x0FF) );
+
+    MS_QueueStr( buf );
 }
 
 static void MassStorage_File_Close( void )
 {
-	printf( "EMU: SD: end file.\n" );
-#ifdef NEVER
-	if( fp != NULL ) {
-		fclose( fp );
-		fp = NULL;
-	}
-#endif
+    printf( "EMU: SD: end file.\n" );
+
+    if( readFile != NULL ) {
+	fclose( readFile );
+	readFile = NULL;
+    }
+
+    if( writeFile != NULL ) {
+	fclose( writeFile );
+	writeFile = NULL;
+    }
 }
 
 /* **********************************************************************
@@ -469,15 +556,18 @@ static void MassStorage_Sector_Close( void )
     ~0:FC	close
     ~0:FS=data	Send string
 
+	Nc=xx,yy	xx=Nbytes (not nibbles, yy=2's comp invert(sum)+1
+		yy = (~sumVal)+1
     0123
     ~0:SR=D,T,S	read drive D, Track T, Sector S to buffer
     ~0:SW=D,T,S	write buffer to drive D, Track T, sector S
     ~0:SC	close sector file
     ~0:SS=data	Data from sector read
+
  */
 
 
-/* MassStorage_ParseLine
+/* MassStorage_ParseLinF
  *	Parse the line coming in from the host computer
  *	Valve it off to the right helper function
  */
