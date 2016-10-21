@@ -1,6 +1,9 @@
 
 /* Version info
  *  
+ *  v005 : 2016-10-20
+ *         directory listings changed to asciihex
+ *
  *  v004 : 2016-10-09
  *         cat/send file fails if it tries to send a directory
  *         'c' and 'l' shortcut commands added for debugging
@@ -15,7 +18,7 @@
  *         Initial version, bascic structure, directory P commands
  */
 
-#define kStr_Version              "N0=SSDD1,v004"
+#define kStr_Version              "N0=SSDD1,v005"
 /* Version string is the following format:
  *  {header}={deviceID},{device's version number}
  *  SSDD1 = Serial SD Drive 1

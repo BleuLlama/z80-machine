@@ -15,6 +15,7 @@
 #include "defs.h"
 #include "storage.h"
 #include "rc2014.h"	/* common rc2014 emulator headers */
+#include "../Arduino/SDDrive/Strings.h"
 
 
 /* ********************************************************************** */
@@ -89,6 +90,34 @@ int MS_QueueHex( unsigned char val )
 
     sprintf( b, "%02x", val );
     return MS_QueueStr( b );
+}
+
+/* MS_QueueHexString
+ *	take a string, queue the hex values for the string
+ *	returns the number of bytes pushed
+ */
+int MS_QueueHexString( const char * str )
+{
+    int ret = 0;
+
+    while( str && *str ) {
+	ret += MS_QueueHex( *str );
+	str++;
+    }
+    return ret;
+}
+
+/* MS_QueueHexLong
+ *	take a value, queue the hex values for it
+ *	returns the number of bytes pushed
+ */
+int MS_QueueHexLong( long val )
+{
+    char buf[16];
+
+    sprintf( buf, "%ld", val );
+
+    return MS_QueueHexString( buf );
 }
 
 
@@ -177,6 +206,7 @@ void MassStorage_Init( void )
 
 #define kSD_Path 	"SD_DISK/"
 
+
 /* MassStorage_Do_Listing
  *	Takes a directory list of the passed-in path
  *	Queues all of the strings into the queue.
@@ -200,7 +230,7 @@ static void MassStorage_Do_Listing( char * path )
     theDir = opendir( pathbuf );
 
     if( !theDir ) {
-	MS_QueueStr( "-0:E6=No.\n" );
+	MS_QueueStr( "-0:" kStr_Error_CmdFail "\n" );
 	return;
     }
 
@@ -225,14 +255,16 @@ static void MassStorage_Do_Listing( char * path )
 
 	    /* output the correct line */
 	    if( status.st_mode & S_IFDIR ) {
-		sprintf( pathbuf, "-0:PD=%s/\n",
-			theDirEnt->d_name );
-		MS_QueueStr( pathbuf );
+		MS_QueueStr( "-0:PD=" );
+		MS_QueueHexString( theDirEnt->d_name );
+		MS_QueueStr( "\n" );
 		nDirs++;
 	    } else {
-		sprintf( pathbuf, "-0:PF=%s,%ld\n",
-			theDirEnt->d_name, (long)status.st_size );
-		MS_QueueStr( pathbuf );
+		MS_QueueStr( "-0:PF=" );
+		MS_QueueHexString( theDirEnt->d_name );
+		MS_QueueHex( ',' );
+		MS_QueueHexLong( (long)status.st_size );
+		MS_QueueStr( "\n" );
 		nFiles++;
 	    }
 
@@ -258,6 +290,7 @@ static void MassStorage_Do_MakeDir( char * path )
 	printf( "EMU: SD: mkdir [%s]\n", path ); 
 	printf( "         %s\n", pathbuf );
 	mkdir( pathbuf, 0755 );
+	MS_QueueStr( kStr_CmdOK );
 }
 
 static void MassStorage_Do_Remove( char * path )
@@ -270,6 +303,7 @@ static void MassStorage_Do_Remove( char * path )
 	/* let's be stupid and just try to remove the file AND dir */
 	rmdir( pathbuf );
 	unlink( pathbuf );
+	MS_QueueStr( kStr_CmdOK );
 }
 
 /* **********************************************************************
@@ -292,7 +326,7 @@ static FILE * writeFile = NULL;
 	2. While there's space in the queue buffer
 	  2A. Read in the next 16 bytes -> NRead
 	  2B. if read 0 bytes:
-	    2Ba. queue new -0:Fe=(size) line
+	    2Ba. queue new -0:FE=(size) line
 	  2C. else
 	    2Ca. queue new -0:FS= line
 
@@ -313,11 +347,10 @@ static FILE * writeFile = NULL;
  */
 static void MassStorage_FillCheck( void )
 {
-#define NPerFill (10)	/* queue buf must be this*2+8+pad minimum */
+#define NPerFill (16)	/* queue buf must be this*2+8+pad minimum */
 
     char databuf[ (NPerFill * 2) + 2];
     char strbuf[512];
-    char hexbuf[8];
     size_t nRead;
     int j;
 
@@ -331,13 +364,13 @@ static void MassStorage_FillCheck( void )
 
 	if( nRead > 0 ) {
 	    /* make a queue data message */
-	    sprintf( strbuf, "-0:FS=" );
+	    MS_QueueStr( "-0:FS=" );
+
 	    for( j=0 ; j<nRead ; j++ ) {
-		sprintf( hexbuf, "%02x", databuf[j] );
-		strcat( strbuf, hexbuf );
+		MS_QueueHex( databuf[j] );
 	    }
-	    strcat( strbuf, "\n" );
-	    MS_QueueStr( strbuf );
+
+	    MS_QueueStr( "\n" );
 
 	} else {
 	    /* no more data, send the footer */
@@ -367,7 +400,7 @@ static void MassStorage_File_Start_Read( char * path )
     if( readFile == NULL ) {
 	/* couldn't open file. */
 	printf( "EMU: SD: Can't open %s\n", pathbuf );
-	MS_QueueStr( "-0:E9=Not Found.\n" );
+	MS_QueueStr( "-0:" kStr_Error_FileNotFound "\n" );
 	return;
     }
 
@@ -395,7 +428,7 @@ static void MassStorage_File_Start_Write( char * path )
     if( writeFile == NULL ) {
 	/* couldn't open file. */
 	printf( "EMU: SD: Can't open %s\n", pathbuf );
-	MS_QueueStr( "-0:E8=Couldn't write.\n" );
+	MS_QueueStr( "-0:" kStr_Error_NoFileWrite "\n" );
 	return;
     }
 
@@ -424,12 +457,12 @@ static void MassStorage_File_ConsumeString( char * data )
     printf( "EMU: SD: consume data [%s]\n", data ); 
 
     if( writeFile == NULL || data == NULL ) {
-	MS_QueueStr( "-0:E8=Couldn't write:No file\n" );
+	MS_QueueStr( "-0:" kStr_Error_NoFileWrite "\n" );
 	return;
     }
 
     if( strlen( data ) < 1 ) {
-	MS_QueueStr( "-0:E8=Couldn't write:No data\n" );
+	MS_QueueStr( "-0:" kStr_Error_NoFileWrite "\n" );
 	return;
     }
 
@@ -466,7 +499,7 @@ static void MassStorage_File_ConsumeString( char * data )
 	data++;
     }
 
-    sprintf( buf, "-0:Nc=%02x,%02x\n", nBytes, 
+    sprintf( buf, "-0:Nc=x%02x,x%02x\n", nBytes, 
 		(unsigned char)(((~sum)+1) &0x0FF) );
 
     MS_QueueStr( buf );
@@ -589,9 +622,9 @@ static void MassStorage_ParseLine( char * line )
 	switch( line[3] ) {
 	case( 'I' ):
 	    /* Info command */
-	    MS_QueueStr( "-0:N1=Card OK\n" );
-	    MS_QueueStr( "-0:Nt=EMU64\n" );
-	    MS_QueueStr( "-0:Ns=128,meg\n" );
+	    MS_QueueStr( "-0:" kStr_CardOk "\n" );
+	    MS_QueueStr( "-0:" kStr_FAType "42\n" );
+	    MS_QueueStr( "-0:" kStr_Size "100" kStr_SizeUnits "\n" );
 	    break;
 
 	/* Path operations */
@@ -664,12 +697,12 @@ static void MassStorage_ParseLine( char * line )
 
 	default:
 	    error = 6;
-	    MS_QueueStr( "-0:E6=No.\n" );
+	    MS_QueueStr( "-0:" kStr_Error_CmdFail "\n" );
 	    break;
 	}
     } else {
 	error = 3;
-	MS_QueueStr( "-0:E3=No.\n" );
+	MS_QueueStr( "-0:" kStr_Error_NotImplemented "\n" );
     }
 
     if( error != 0 ) {

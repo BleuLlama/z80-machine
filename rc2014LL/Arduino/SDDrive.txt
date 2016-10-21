@@ -95,7 +95,7 @@ N0 notice as above, but also with Error code 0, as above.
 
 Once a card has been inserted, it may send something like:
 
-    -0:N0=SDD1,v004
+    -0:N0=SDD1,v005
     -0:N1=Card OK
     -0:Nt=FAT16
     -0:Ns=952,meg
@@ -146,6 +146,8 @@ Which is what the host gets back. It should be noted that for sending
 out messages, device 0 is the first on the chain, while for responses,
 drive 0 is the last on the chain.
 
+Note: The drive emulator responds with a drive type (Nt) of "FAT42".
+
 
 ------------------------------
                       Commands
@@ -183,8 +185,8 @@ and by letter.
 	Responds with an "PB=" notice. The content of this notice
 	is the path that is being read. Then on consecutive lines,
 	it contains one file or directory name per line. It then
-	ends with a "NE=" notice, where the content is the number
-	of files,subdirectories.
+	ends with a "PE=" notice, where the content is the number
+	of files,subdirectories in decimal.
 
 	Each line will contain the <SUBDIR>+"/" if the preceeding
 	path information is of a subdirectory.
@@ -196,9 +198,20 @@ and by letter.
 
 	    ~0:PL=BASIC
 	    -0:PB=BASIC
-	    -0:LLTEST.BAS,963
-	    -0:USRTEST.BAS,4571
-	    -0:PE=2,0
+	    -0:PF=LLTEST.BAS,963
+	    -0:PF=USRTEST.BAS,4571
+	    -0:PD=Misc/
+	    -0:PE=2,1
+
+	NOTE that the content of the PF and PD items are completely ASCII 
+	encoded, and may actually appear on the wire like this:
+
+	    -0:PB=BASIC/
+	    -0:PD=4241534943
+	    -0:PF=726561646d652e7478742c373432
+	    -0:PD=524f4d73
+	    -0:PF=746573742e7478742c3232
+	    -0:PE=2,2
 
 	Similar to "dir" or "ls"
 
@@ -253,7 +266,7 @@ be ignored.
 
 	Example:
 
-	    ~0:FR test.txt
+	    ~0:FR=test.txt
 	    -0:FB=test.txt
 	    -0:FS=48656C6C6F2C20776F726C64210A0A3A440A0A2D
 	    -0:FS=730A
@@ -263,6 +276,7 @@ be ignored.
 	Note: There may be additional optional content sent between
 	the FP, FB and FE tags to assist in progress displays and
 	such. Here's an example from a larger file:
+
 
 	    ~0:FR=readme.txt
 	    -0:FB=readme.txt
@@ -287,6 +301,9 @@ be ignored.
 	file progress notification. The two fields are: 
 
 	    (current byte count)/(total file size)
+
+	These fields, along with the contents of FE are all decimal
+	values.
 
 
 ~0:FW=<path>
@@ -328,11 +345,14 @@ be ignored.
 	    ~0:FW=newfile.txt
 	    -0:N2=OK
 	    ~0:FS=30313233343536373839
-	    -0:Nc=0A,9A
+	    -0:Nc=x0A,x9A
 	    ~0:FS=40414243444546474849
-	    -0:Nc=0A,33
+	    -0:Nc=x0A,x33
 	    ~0:FC
 	    -0:N2=OK
+
+	The checksum and number of bytes are in hexidecimal and are
+	prepended by an 'x' to indicate this.
 
 ~0:FC
 	Closes the currently open file for read or write. Does
@@ -390,14 +410,17 @@ their own
 	    ~0:SW=A,0002,0301
 	    -0:N2=OK
 	    ~0:SS=00000000000000000000000000000000
-	    -0:Nc=10,9A
+	    -0:Nc=x10,x9A
 	    ~0:SS=00000000000000000000000000000000
-	    -0:Nc=10,9A
+	    -0:Nc=x10,x9A
 		...
 	    ~0:SS=00000000000000000000000000000000
-	    -0:Nc=10,9A
+	    -0:Nc=x10,x9A
 	    ~0:SC
 	    -0:N2=OK
+
+	The values returned in Nc are explained above in "FS".
+
 
 ~0:SC
 	Closes the currently open sector file for write. Does nothing
@@ -410,29 +433,45 @@ their own
 ----------------------------------------
                      Appendix A: Notices
 
-	N0	Notice of device ID and version
-	N1	Card functional/readable
-	Nt	Filesystem type (FATxx)
-	Ns	Drive size,units
+	N0	"SSDD1,v004"
+		Notice of device ID and version
+	N1	"Card OK"
+		Card functional/readable
+	Nt	"FAT16"
+		Filesystem type (FATxx)
+	Ns	"100,meg"
+		Drive size,units
+
 
 ----------------------------------------
                       Appendix B: Errors
  
 
-	E0	No card is inserted or detected
-	E1	SD card initialization failed
-	E2	No FAT filesystem found
-	E3	General Error. "Nope"
-	E4	Line could not be read from host
-	E5	Echo of erroroneous data
-	E6	General Failure
-	E7	Bad ASCII nibble count
-	E8	No file open for write
-	E9	File not found
-	EA	File not writable
+	E0	"No card"
+		No card is inserted or detected
+	E1	"SD Init failed"
+		SD card initialization failed
+	E2	"No FAT"
+		No FAT filesystem found
+	E3	"Nope"
+		General Error.
+	E4	"Bad Line"
+		Line could not be read from host
+	E5	(Variable contents)
+		Echo of erroroneous data
+	E6	"Failed"
+		General Failure
+	E7	"Nibbles"
+		Bad ASCII nibble count
+	E8	"No WR"
+		No file open for write
+	E9	"FNF"
+		File not found
+	EA	"FNWR"
+		File not writable
+		
 
-
-----------------------------------------
+----------------------------------------
                   Appendix C: IHX Format
 
 The two primary types of IHX records are:
