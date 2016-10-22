@@ -8,7 +8,9 @@ all:	roms
 ROMDIRS := \
 	lloader \
 	basic.32 \
-	basic.56 \
+	basic.56 
+
+OLDDIRS: = \
 	smalltest \
 	aciatest \
 	iotest
