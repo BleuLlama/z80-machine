@@ -30,6 +30,13 @@ ShowMemoryMap:
 	ld	h, a
 	ld	l, a		; hl = $0000	(start)
 
+	ld	c, a
+	ld	b, a
+	push 	bc
+	pop	ix
+	push 	bc
+	pop 	iy
+
 	add	a, #1
 	ld	c, a		; c = scratch value to write
 	push	hl
@@ -63,6 +70,7 @@ memloop:
 	; default to ROM
 memrom:
 	ld	hl, #str_rom
+	inc	ix
 	jr	memnext
 
 memopen:
@@ -71,6 +79,7 @@ memopen:
 
 memram:
 	ld	hl, #str_ram
+	inc	iy
 	jr	memnext
 	
 
@@ -85,17 +94,55 @@ memnext:
 	; next
 	ld	a, h
 	cp	#0xF0
-	ret	z 		; we're done...
+	jr	z, memsummary	; we're done
 
 	add	a, #0x10
 	ld	h, a		; hl += $1000
 	push	hl
 	jr	memloop
 
-	xor	a
 
+memsummary:
+	call	PrintNL
+
+	push	ix		; number of 2k ROM banks
+	pop	bc
+	call	memadjust
+	call	printByte
+	ld	hl, #str_kROM
+	call	Print
+	call	PrintNL
+
+	push	iy
+	pop	bc
+	call	memadjust
+	call 	printByte
+	ld	hl, #str_kRAM
+	call	Print
+	call	PrintNL
+	
+	xor	a
 	ret
 
+; memadjust
+;	value is in BC 0..16 (using a table
+;	messes up hl, stores value in A
+memadjust:
+	ld	a, c
+	cp	#0x00
+	ret	z		; 0
+
+	dec 	bc		; 0..15
+	ld	hl, #memtab
+	add	hl, bc
+	ld	a, (hl)
+	ret
+
+memtab:
+	.byte 0x02, 0x04, 0x06, 0x08
+	.byte 0x10, 0x12, 0x14, 0x16
+	.byte 0x18, 0x20, 0x22, 0x24
+	.byte 0x26, 0x28, 0x30, 0x32
 
 str_ram: .asciz	"RAM"
 str_rom: .asciz	"    ROM"
@@ -105,4 +152,9 @@ str_memheader:
 	.asciz	"Memory map probe:\n"
 str_0x:
 	.asciz	" 0x"
+
+str_kROM: 
+	.asciz 	" kBytes ROM"
+str_kRAM: 
+	.asciz 	" kBytes RAM"
 
