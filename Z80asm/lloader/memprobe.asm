@@ -125,8 +125,10 @@ memsummary:
 	ret
 
 ; memadjust
-;	value is in BC 0..16 (using a table
+;	value is in BC 0..16 (using a table)
 ;	messes up hl, stores value in A
+;	I could probably multiply A by 4, and BCD it
+;	but meh. this is fine.
 memadjust:
 	ld	a, c
 	cp	#0x00
@@ -138,11 +140,11 @@ memadjust:
 	ld	a, (hl)
 	ret
 
-memtab:
-	.byte 0x02, 0x04, 0x06, 0x08
-	.byte 0x10, 0x12, 0x14, 0x16
-	.byte 0x18, 0x20, 0x22, 0x24
-	.byte 0x26, 0x28, 0x30, 0x32
+memtab: ; bcd list of kbytes per num banks
+	.byte 0x04, 0x08, 0x12, 0x16
+	.byte 0x20, 0x24, 0x28, 0x32
+	.byte 0x36, 0x40, 0x44, 0x48
+	.byte 0x52, 0x56, 0x60, 0x64
 
 str_ram: .asciz	"RAM"
 str_rom: .asciz	"    ROM"
