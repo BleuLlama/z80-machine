@@ -375,7 +375,7 @@ MF_prompt:
 	call	z, directoryList
 
 	cp	#'R
-	call	z, catFile
+	call	z, catReadme
 
 	cp	#'I
 	call	z, sdInfo
@@ -443,12 +443,6 @@ ShowSysInfo:
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-str_Working:
-	.asciz	"Working.."
-
-str_Done:
-	.asciz	"..Done!\r\n"
 
 ; CopyROMToRAM
 ;	copies $0000 thru $2000 to itself
@@ -553,7 +547,7 @@ bootloop:
 	
 	; uncomment if you want dots printed while it loads...
 	  ld	a, #0x2e	; '.'
-	  out	(TermData), a	; send it out.
+	  call	PutCh		; send it out
 
 	jp	bootloop	; and do the next byte
 
@@ -597,96 +591,359 @@ swapOutRom:
 endSwapOutRom:
 
 
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-str_filereadme:
-	.asciz 	"~0:FR readme.txt\n"
+; SD interface helpers
 
-catFile:
-	ld	hl, #str_filereadme; select file
-	call	SendSDCommand
-
-catSDPort:
+DrawHLine:
 	ld	hl, #str_line
 	call	Print
+	ret
 
-CF0:
+; RawCatFromSD
+;  dump everything received in a response until
+;  there's nothing left.  very dumb logic in here.
+RawCatFromSD:
+RCFSD0:
 	; check for more bytes
 	in	a, (SDStatus)
 	and	#DataReady	; more bytes to read?
-	jr	z, CFRet 	; nope. exit out
+	ret	z	 	; nope. exit out
 	
 	; load a byte from the file, print it out
 	in	a, (SDData)	; get the file data byte
 	cp	#0x00		; received null...
-	call	z, CFNull	; nulls become newlines for dir listings
+	call	z, RCFSDNL	; nulls become newlines for dir listings
 	out	(TermData), a	; send it out.
-	;ld	(hl), a		; store it out
 
 	inc	hl		; next position
-	jr	CF0		; repeat
+	jr	RCFSD0		; repeat
 
-CFNull:
+RCFSDNL:
 	push	hl
 	call	PrintNL
 	pop	hl
 	ret
 
-CFRet:
-	ld	hl, #str_line
-	call	Print
+; do a raw dump of everything passed in
+; and draw lines around it.
+RawCatWithLines:
+	call	DrawHLine
+	call	RawCatFromSD
+	call	DrawHLine
+	ret
+
+;; Mass storage helpers
+
+MSToken_Unknown		= 0x00
+MSToken_None		= 0x01
+MSToken_EOF		= 0x02
+
+MSToken_Path		= 0x10	; P  first byte of a PATH token
+MSToken_PathBegin	= 0x11	;  B
+MSToken_PathEnd		= 0x12	;  E
+MSToken_PathDir		= 0x13	;  D
+MSToken_PathFile	= 0x14	;  F
+
+MSToken_File		= 0x20	; F  first byte of a FILE token
+MSToken_FileBegin	= 0x21	;  B
+MSToken_FileEnd		= 0x22	;  E
+MSToken_FileString	= 0x23	;  S
+
+
+; MSGetHeader
+;	scans through to the current character being '='
+;	rest of the line is still in the device, unread yet
+;	a contains the token ID;
+MSGetHeader:
+	; read in a loop
+	; 	(last b goes into c)
+	;	(current char goes in b)
+	;	until EOF	- return NONE
+	; 	until '='	- check BC for code to return
+
+	; clear variables
+	xor	a
+	ld	a, #'x
+	ld 	b, a
+	ld	c, a
+
+	; get loop
+MSGetLoop:
+	; check for more bytes
+	in	a, (SDStatus)
+	and	#DataReady	; more bytes to read?
+	jr	z, MSREOF	; end of file, return
+
+	; we got one, check if it's an equals
+        in      a, (SDData)     ; get the file data byte
+	;out	(TermData), a
+	cp	#'=		; is it an equals?
+	jr	z, MSREquals
+	
+	ld 	d, a		; stash a into d temporarily
+
+	; A (current) -> B (prev) -> C (oldest)
+	ld	a, b		; copy B into C
+	ld	c, a
+
+	ld	a, d		; copy A (in D) into B
+	ld	b, a
+
+	jr	MSGetLoop	; and do it again
+
+MSREOF:
+	ld	a, #MSToken_EOF
+	ret
+
+	; optimally, this should probably be a lookup table.
+
+MSREquals:
+	ld	a, c		; check the maintoken
+	cp	#'P		; path stuff
+	jr	z, MSRP
+	cp	#'F		; file stuff
+	jr	z, MSRF
+	ld	a, #MSToken_Unknown
+	ret
+
+MSRP:
+	ld	a, b		; check the subtoken
+
+	ld	c, #MSToken_PathBegin
+	cp	#'B		; path begin
+	jr 	z, MSRetC
+
+	ld	c, #MSToken_PathEnd
+	cp	#'E		; path end
+	jr 	z, MSRetC
+
+	ld	c, #MSToken_PathDir
+	cp	#'D		; path dir
+	jr 	z, MSRetC
+
+	ld	c, #MSToken_PathFile
+	cp	#'F		; path file
+	jr 	z, MSRetC
+
+
+	ld	a, #MSToken_Unknown
+	ret
+
+MSRF:
+	ld	a, b		; check the subtoken
+
+	ld	c, #MSToken_FileBegin
+	cp	#'B		; file begin
+	jr 	z, MSRetC
+
+	ld	c, #MSToken_FileEnd
+	cp	#'E		; file end
+	jr 	z, MSRetC
+
+	ld	c, #MSToken_FileString
+	cp	#'S		; file string
+	jr 	z, MSRetC
+
+	ld	a, #MSToken_Unknown
+	ret
+
+MSRetC:
+	ld	a, c		; token code is in 'C'
+	ret
+
+
+MSSkipToNewline:
+	; check for more bytes
+	in	a, (SDStatus)
+	and	#DataReady	; more bytes to read?
+	ret	z		; end of file
+
+	; we got one, check if it's an equals
+        in      a, (SDData)     ; get the file data byte
+	cp	#'\r		; is it a newline
+	cp	#'\n		; is it a newline
+	ret	z	
+	jr	MSSkipToNewline	; repeat
+
+
+MSDecodeToNewline:
+	xor	a
+	ld	b, a		; b is our byte counter
+	ld	c, a		; c gets our output value
+	ld	d, a		; d gets our temp 'a' for adding
+
+__deLoop:
+	; check for more bytes
+	in	a, (SDStatus)
+	and	#DataReady	; more bytes to read?
+	ret	z		; end of file
+
+	; we got one, check if it's an equals
+        in      a, (SDData)     ; get the file data byte
+	cp	#'\r		; is it a newline
+	cp	#'\n		; is it a newline
+	ret	z
+
+	; not a newline, do something with it
+
+	; range of valid characters (ascii sorted)
+	; '0'  '9'   'A'  'F'  	'a'  'f'
+	; 0x30-0x39  0x41-0x46  0x61-0x66
+	
+	cp	#'0		; less than '0'? 
+	jr	c, __deLoop	; yep, try again
+	cp	#'9 +1		; between '0' and '9' inclusive?
+	jr	c, __deDigit
+
+	cp	#'A		; below 'A'?
+	jr	c, __deLoop	; yep, try again
+	cp	#'F +1		; between 'A' and 'F' inclusive?
+	jr	c, __deUcChar
+
+	cp	#'a		; below 'a'?
+	jr	c, __deLoop	; yep, try again
+	cp	#'f +1		; between 'a' and 'f' inclusive?
+	jr	c, __deLcChar
+
+	jr	__deLoop	; wasn't valid... repeat
+
+
+__deDigit:
+	sub	a, #'0		; '0'-'9' -> 0x00 - 0x09
+	jr	__deConsume	; consume the nibble
+
+__deLcChar:
+	and	#0xDF		; make uppercase (mostly)
+__deUcChar:
+	sub	a, #'A		; 'A'-'F' -> 0x0A - 0x0F
+	add	a, #0x0a
+
+__deConsume:
+	ld	d, a		; d=a
+
+	ld	a, c		;
+	sla	a
+	sla	a
+	sla	a
+	sla	a		; a = a << 4
+	add	a, d		; a = (a<<4) | newNib
+	ld	c, a		; store aside the new value
+	
+	ld	a, b		; a = b
+	inc	a		; next byte shifted in
+	ld	b, a
+	bit	#0, a
+
+	jr	nz, __deLoop	; nothing we can use yet, get another
+
+	ld	a, c		; restore the new accumulated value
+	call	PutCh
+	jr	__deLoop
+	
+
+; DecodeCatFromSD
+;	take the data coming in, and based on the tag, do something:
+;
+;	 file:
+;	FB	-> "File: " <parameter>
+;	FS	-> decode( <parameter> )
+;	FE	-> <parameter> " bytes"
+;	 dir list
+;	PB	-> "Listing of directory " <parameter>
+;	PF	-> "File: " decode( <parameter> )
+;	PD	-> " Dir: " decode( <parameter> )
+;	PE	-> "Files, Dirs: " <parameter>
+;	
+DecodeCatFromSD:
+	call	MSGetHeader
+	;call	printByte
+
+	; are we done?  If so, just return
+	cp	#MSToken_EOF
+	ret	z
+
+	cp	#MSToken_PathFile
+	jr	z, _DCFS_File
+
+	cp	#MSToken_PathDir
+	jr	z, _DCFS_Dir
+
+	cp	#MSToken_FileString
+	jr	z, _DCFS_Text
+
+	; don't know what it was, just skip its data. 
+	call	MSSkipToNewline
+
+	; and repeat...
+	jr	DecodeCatFromSD
+
+	; filenames just get dumped as-is
+_DCFS_File:
+	ld	hl, #str_file		; file header
+	call	Print			; print it
+	call	MSDecodeToNewline	; decode the content
+	call	PrintNL			; print a newline
+	jr	DecodeCatFromSD		; continue to the next 
+
+	; directory names get a slash appended
+_DCFS_Dir:
+	ld	hl, #str_dir		; dir header
+	call	Print			; print it
+	call	MSDecodeToNewline	; decode the content
+	ld	a, #'/
+	call	PutCh
+	call	PrintNL			; print a newline
+	jr	DecodeCatFromSD		; continue to the next 
+
+	; text gets dumped verbatim
+_DCFS_Text:
+	call	MSDecodeToNewline	; decode the content
+	jr	DecodeCatFromSD		; continue to the next 
+
+; decode the data coming in,
+; and draw lines around it.
+DecodeCatWithLines:
+	call	DrawHLine
+	call	DecodeCatFromSD
+	call	DrawHLine
+
+	xor	a
+	ret
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+sdInfo:
+	ld	hl, #cmd_info
+
+	call	SendSDCommand
+	call	RawCatWithLines
 
 	xor	a
 	ret
 
 
-sdInfo:
-	ld	hl, #cmd_info
+catReadme:
+	ld	hl, #str_filereadme; select file
 	call	SendSDCommand
-	jr	catSDPort
+	call	DecodeCatWithLines
+
+	xor	a
+	ret
 
 
 directoryList:
 	ld	hl, #cmd_directory
 	call	SendSDCommand
-
-	ld	hl, #str_line
-	call	Print
-
-DL0:
-	; check for more bytes
-	in	a, (SDStatus)
-	and	#DataReady	; more bytes to read?
-	jr	z, DLRet 	; nope. exit out
-	
-	; load a byte from the file, print it out
-	in	a, (SDData)	; get the file data byte
-	cp	#0x00		; received null...
-	call	z, DLNull	; nulls become newlines for dir listings
-	out	(TermData), a	; send it out.
-	;ld	(hl), a		; store it out
-
-	inc	hl		; next position
-	jr	CF0		; repeat
-
-DLNull:
-	push	hl
-	call	PrintNL
-	pop	hl
-	ret
-
-DLRet:
-	ld	hl, #str_line
-	call	Print
+	call	DecodeCatWithLines
 
 	xor	a
 	ret
-
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Text strings
 
 ; Version history
+;   v011 2016-10-23 - New decoder working for directory, files
 ;   v010 2016-10-13 - Working on Terminal, added ~I, Directory
 ;   v009 2016-10-11 - Internal support for hex, new SD interface
 ;   v008 2016-09-28 - Terminal fixed, new file io command strings
@@ -700,29 +957,35 @@ DLRet:
 
 str_splash:
 	.ascii	"Lloader Shell for RC2014/LL MicroLlama\r\n"
-	.ascii	"  v010 2016-Oct-13  Scott Lawrence\r\n"
+	.ascii	"  v011 2016-Oct-23  Scott Lawrence\r\n"
 	.asciz  "\r\n"
 	
 cmd_getinfo:
 	.asciz  "\n~0:I\n"
 
 cmd_bootfile:
-	.asciz	"\n~0:FR ROMs/boot.hex\n"
+	.asciz	"\n~0:FR=ROMs/boot.hex\n"
 
 cmd_bootCPM:
-	.asciz	"\n~0:FR ROMs/cpm.hex\n"
+	.asciz	"\n~0:FR=ROMs/cpm.hex\n"
 
 cmd_bootBasic32:
-	.asciz	"\n~0:FR ROMs/basic32.hex\n"
+	.asciz	"\n~0:FR=ROMs/basic32.hex\n"
 
 cmd_bootBasic56:
-	.asciz	"\n~0:FR ROMs/basic56.hex\n"
+	.asciz	"\n~0:FR=ROMs/basic56.hex\n"
 
 str_loaded:
 	.asciz 	"Done loading. Restarting...\n\r"
 
 str_nofile:
 	.asciz	"Couldn't load hex file.\n\r"
+
+str_Working:
+	.asciz	"Working.."
+
+str_Done:
+	.asciz	"..Done!\r\n"
 
 str_line:
 	.asciz	"--------------\n\r"
@@ -732,6 +995,15 @@ cmd_directory:
 
 cmd_info:
 	.asciz	"\n~0:I\n"
+
+str_filereadme:
+	.asciz 	"~0:FR=readme.txt\n"
+
+str_dir:
+	.asciz 	"  Dir: "
+str_file:
+	.asciz 	" File: "
+
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
