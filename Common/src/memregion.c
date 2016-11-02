@@ -71,7 +71,7 @@ void regions_init( MemRegion * m, byte * z80mem )
 	    if( fp )
 	    {
 		size_t nbytes = fread( m->mem, 1, m->length, fp );
-		printf( "%s: %ld bytes", m->loadFileName, nbytes );
+		printf( "%s: %ld bytes", m->loadFileName, (long int)nbytes );
 		fclose( fp );
 	    } else {
 		printf( "%s: read failed", m->loadFileName );

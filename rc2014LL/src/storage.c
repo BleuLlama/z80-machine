@@ -254,7 +254,7 @@ static void MassStorage_Do_Listing( char * path )
 	    stat( pathbuf, &status );
 
 	    /* output the correct line */
-	    if( status.st_mode & S_IFDIR ) {
+	    if( S_ISDIR( status.st_mode )) {
 		MS_QueueStr( "-0:PD=" );
 		MS_QueueHexString( theDirEnt->d_name );
 		MS_QueueStr( "\n" );
@@ -379,7 +379,7 @@ static void MassStorage_FillCheck( void )
 	    readFile = NULL;
 
 	    /* send the footer */
-	    sprintf( strbuf, "-0:FE=%ld\n", nRead );
+	    sprintf( strbuf, "-0:FE=%ld\n", (long int)nRead );
 	    MS_QueueStr( strbuf );
 	}
     }
