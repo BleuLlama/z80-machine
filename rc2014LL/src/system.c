@@ -36,13 +36,22 @@ MemRegion mems[] =
 };
 
 
-void romen_update( const byte val )
+/* romen_update
+	update the rom enable bit
+	returns 1 if it changed
+*/
+int romen_update( const byte val )
 {
+    static byte lastByte = 0;
+
+    if( lastByte == (val & 0x01 )) return 0;
+
     if( val & 0x01 ) {
 	mems[0].active = REGION_INACTIVE;
     } else {
 	mems[0].active = REGION_ACTIVE;
     }
+    return 1;
 }
 
 
@@ -94,8 +103,9 @@ void myHandlePortWrite00( const byte data )
 {
     HandlePortWrite00( data );
 
-    romen_update( data );
-    regions_display( mems );
+    if( romen_update( data )) {
+    	regions_display( mems );
+    }
 }
 
 
