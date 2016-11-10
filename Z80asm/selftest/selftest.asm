@@ -14,16 +14,26 @@
 ; NOTE: This does NOT use any RAM at all.  So there are intentionally
 ;	no subroutines, no stack things, nothing like that.
 
+; IO Board displays codes:
+;	bottom bit is always 0 to prevent bank switching in LL system
+;	1xxx xxx0	pass/fail codes
+;	xxxx xxx0	in echo test, this shows the current ascii code <<1
+
 .include "../Common/hardware.asm"
 
 
 ; additional defines
-Emulation = 1
+Emulation = 1	; are we building for emulator?
+LEDComm	  = 1	; display ascii on LEDs
 
 
 LF 	= 0x0a
 CR	= 0x0D
 NUL	= 0x00
+
+; for the ROM/RAM display
+ROMCHAR = 'O
+RAMCHAR = 'A
 
 	.module SELFTEST
 .area	.CODE (ABS)
@@ -56,11 +66,16 @@ digOutTest:
 	and	#0xFE		; mask off bank switch bit
 	out	(DigitalIO), a
 
+	; pass code
+	ld	a, #0x82
+	out	(DigitalIO), a
+
 	jr	ramTest
 
 ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; 
 ; ramTest
 ;	probe memory to find out where ram is
+; 	NOTE: This is destructive to RAM. Deal with it.
 
 ramTest:
 	ld	de, #0x0000	; result goes into d.
@@ -86,6 +101,10 @@ ramTest:
 	add	hl, bc
 	ld	(hl), a		; 0xE000
 
+	; pass code
+	ld	a, #0x84
+	out	(DigitalIO), a
+
 	; write 55 out
 	ld	a, #0x55
 	ld	hl, #0x0000
@@ -105,26 +124,153 @@ ramTest:
 	add	hl, bc
 	ld	(hl), a		; 0xE000
 
-	; write AA out
-	ld	a, #0xAA
+	; pass code
+	ld	a, #0x86
+	out	(DigitalIO), a
+
+	; write numbers out
 	ld	hl, #0x0000
+	ld	a, #0x0F
 	ld	(hl), a		; 0x0000
 	add	hl, bc
+	ld	a, #0x0E
 	ld	(hl), a		; 0x2000
 	add	hl, bc
+	ld	a, #0x0D
 	ld	(hl), a		; 0x4000
 	add	hl, bc
+	ld	a, #0x0C
 	ld	(hl), a		; 0x6000
 	add	hl, bc
+	ld	a, #0x0B
 	ld	(hl), a		; 0x8000
 	add	hl, bc
+	ld	a, #0x0A
 	ld	(hl), a		; 0xA000
 	add	hl, bc
+	ld	a, #0x09
 	ld	(hl), a		; 0xC000
 	add	hl, bc
+	ld	a, #0x08
 	ld	(hl), a		; 0xE000
 
-	; We should assume that 0x0000 is ROM.
+	; text header
+	; it kills me to re-copy this code, but with 0 ram usage...
+roamhdr:
+	ld	hl, #sROAM
+
+_sROAM01:
+	ld	a, (hl)
+	cp	#0x00
+	jr	z, _sROAMDone
+	out	(TermData), a
+	inc	hl
+	jr	_sROAM01
+_sROAMDone:
+
+	; now, let's read the numbers back and display info.
+
+	; test 0x0000
+	ld	hl, #0x0000
+	ld	a, (hl)		; should be 0x0F
+	cp	#0x0F
+	ld	a, #RAMCHAR
+	jr	z, _ROAM0out
+	ld	a, #ROMCHAR
+_ROAM0out:
+	out	(TermData), a
+
+	; test 0x2000
+	add	hl, bc
+	ld	a, (hl)		; should be 0x0E
+	cp	#0x0E
+	ld	a, #RAMCHAR
+	jr	z, _ROAM2out
+	ld	a, #ROMCHAR
+_ROAM2out:
+	out	(TermData), a
+
+	; test 0x4000
+	add	hl, bc
+	ld	a, (hl)		; should be 0x0D
+	cp	#0x0D
+	ld	a, #RAMCHAR
+	jr	z, _ROAM4out
+	ld	a, #ROMCHAR
+_ROAM4out:
+	out	(TermData), a
+
+
+	; test 0x6000
+	add	hl, bc
+	ld	a, (hl)		; should be 0x0C
+	cp	#0x0C
+	ld	a, #RAMCHAR
+	jr	z, _ROAM6out
+	ld	a, #ROMCHAR
+_ROAM6out:
+	out	(TermData), a
+
+
+	; test 0x8000
+	add	hl, bc
+	ld	a, (hl)		; should be 0x0B
+	cp	#0x0B
+	ld	a, #RAMCHAR
+	jr	z, _ROAM8out
+	ld	a, #ROMCHAR
+_ROAM8out:
+	out	(TermData), a
+
+
+	; test 0xA000
+	add	hl, bc
+	ld	a, (hl)		; should be 0x0A
+	cp	#0x0A
+	ld	a, #RAMCHAR
+	jr	z, _ROAMAout
+	ld	a, #ROMCHAR
+_ROAMAout:
+	out	(TermData), a
+
+
+	; test 0xC000
+	add	hl, bc
+	ld	a, (hl)		; should be 0x09
+	cp	#0x09
+	ld	a, #RAMCHAR
+	jr	z, _ROAMCout
+	ld	a, #ROMCHAR
+_ROAMCout:
+	out	(TermData), a
+
+
+	; test 0xE000
+	add	hl, bc
+	ld	a, (hl)		; should be 0x08
+	cp	#0x08
+	ld	a, #RAMCHAR
+	jr	z, _ROAMEout
+	ld	a, #ROMCHAR
+_ROAMEout:
+	out	(TermData), a
+
+	
+
+	; footer
+	ld	a, #CR
+	out	(TermData), a
+	ld	a, #LF
+	out	(TermData), a
+
+	jp	ramResult
+
+; I know there are better ways to do this, but this will 
+; make for simpler code.
+sROAM:
+	.ascii	"02468ACE  * 0x1000  (A = RAM, O = ROM)"
+	.byte	CR, LF, NUL
+
 
 ramResult:
 	ld	a, d
@@ -133,6 +279,11 @@ ramResult:
 	; ram is '1's 	2468 ACE0
 	; eg. stock     0000 1111
 	; messed up 	0000 0100
+
+	; pass code
+	ld	a, #0x88
+	out	(DigitalIO), a
+
 	jr	serialTest
 
 
@@ -152,8 +303,11 @@ _s01:
 	jr	_s01
 
 _serDone:
-	jr	serEcho
+	; pass code
+	ld	a, #0x8A
+	out	(DigitalIO), a
 
+	jr	serEcho
 	
 sText:
 	.byte	CR, LF, CR, LF
@@ -182,8 +336,20 @@ _seLoop:
 	in 	a, (TermStatus)	; comm status
 	and	#DataReady	; byte ready for us?
 	jr	z, _seLoop	; nope. loop back
-	; echo it
+
+	; get the byte
 	in	a, (TermData)	; get the byte
+
+.if( LEDComm )
+	; display it on the IO card
+	ld	b, a
+	sla	a
+	and	#0xFE
+	out	(DigitalIO), a
+	ld	a, b
+.endif
+
+	; echo it
 	cp	#CR		; print a newline
 	jr	z, _seNL
 	cp	#LF

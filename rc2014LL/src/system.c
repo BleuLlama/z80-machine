@@ -26,11 +26,8 @@ MemRegion mems[] =
 		"ROMs/selftest.rom" },
 		//"ROMs/lloader.rom" },
 		//"ROMs/basic32.rom" },
-/*
     { 0x0000, (32 * 1024), REGION_RW, REGION_ACTIVE, NULL, NULL },
     { 0x8000, (32 * 1024), REGION_RW, REGION_ACTIVE, NULL, NULL },
-*/
-    { 0xc000, 0x2000, REGION_RW, REGION_ACTIVE, NULL, NULL }, /* f'ed up */
 
     REGION_END
 };
