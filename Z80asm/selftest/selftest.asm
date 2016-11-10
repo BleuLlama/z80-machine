@@ -70,7 +70,35 @@ digOutTest:
 	ld	a, #0x82
 	out	(DigitalIO), a
 
+	jr	serialTest
+
+; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; 
+; serialTest
+;	output some stuff through the ACIA
+;
+serialTest:
+	ld	hl, #sText
+
+_s01:
+	ld	a, (hl)
+	cp	#0x00
+	jr	z, _serDone
+	out	(TermData), a
+	inc	hl
+	jr	_s01
+
+_serDone:
+	; pass code
+	ld	a, #0x84
+	out	(DigitalIO), a
+
 	jr	ramTest
+	
+sText:
+	.byte	CR, LF, CR, LF
+	.ascii	"This is test ACIA unthrottled output."
+	.byte	CR, LF, CR, LF, NUL
+
 
 ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; 
 ; ramTest
@@ -102,7 +130,7 @@ ramTest:
 	ld	(hl), a		; 0xE000
 
 	; pass code
-	ld	a, #0x84
+	ld	a, #0x86
 	out	(DigitalIO), a
 
 	; write 55 out
@@ -125,7 +153,7 @@ ramTest:
 	ld	(hl), a		; 0xE000
 
 	; pass code
-	ld	a, #0x86
+	ld	a, #0x88
 	out	(DigitalIO), a
 
 	; write numbers out
@@ -273,46 +301,15 @@ sROAM:
 
 
 ramResult:
-	ld	a, d
-	and	#0xFE
-	out	(DigitalIO), a
 	; ram is '1's 	2468 ACE0
 	; eg. stock     0000 1111
 	; messed up 	0000 0100
 
 	; pass code
-	ld	a, #0x88
-	out	(DigitalIO), a
-
-	jr	serialTest
-
-
-; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; 
-; serialTest
-;	output some stuff through the ACIA
-;
-serialTest:
-	ld	hl, #sText
-
-_s01:
-	ld	a, (hl)
-	cp	#0x00
-	jr	z, _serDone
-	out	(TermData), a
-	inc	hl
-	jr	_s01
-
-_serDone:
-	; pass code
 	ld	a, #0x8A
 	out	(DigitalIO), a
 
 	jr	serEcho
-	
-sText:
-	.byte	CR, LF, CR, LF
-	.ascii	"This is test ACIA unthrottled output."
-	.byte	CR, LF, CR, LF, NUL
 
 ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; 
 ; serEcho
