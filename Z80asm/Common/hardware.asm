@@ -18,16 +18,18 @@ TermData	= 0x81	; Data on MC6850 for terminal comms
 ;;;;;;;;;;;;;;;;;;;;
 SDStatus	= 0xC0	; Status on MC6850 for SD comms
 SDData		= 0xC1	; Data on MC6850 for SD comms
-	; SD Commands: (newline delimited)
-	;  ~L		Get directory listing
-	;  ~Fname	Set operations name (file or directory)
-	;  ~R		Open that file for read
+	; See SDDS files for more info
 
 ;;;;;;;;;;;;;;;;;;;;
 RomDisable	= 0x00	; IO port 00
+	; for RC2014/LL hardware
 	; bit 0 (0x01) is the ROM disable bit,
 	;  = 0x00 -> ROM is active
 	;  = 0x01 -> ROM is disabled
+
+;;;;;;;;;;;;;;;;;;;;
+DigitalIO	= 0x00	; IO port 00
+			; for Digital IO board
 
 ;;;;;;;;;;;;;;;;;;;;
 EmulatorControl	= 0xEE
@@ -35,3 +37,4 @@ EmulatorControl	= 0xEE
 	;   'A' for RC2014 emu (32k)    v1.0 2016/10/10
 	;   'B' for RC2014LL emu (64k)  v1.0 2016/10/10
 	; write F0 to exit emulator
+ EmuExit	= 0xF0

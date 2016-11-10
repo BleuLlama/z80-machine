@@ -36,7 +36,26 @@ static byte digital_io1 = 0x11;
 static byte digital_io2 = 0x22;
 static byte digital_io3 = 0x33;
 
-void HandlePortWrite00( const byte data ) { digital_io0 = data; }
+void HandlePortWrite00( const byte data ) 
+{
+    int mask;
+
+    printf( "DigitalIO: 0x%02x: " );
+    for( mask = 0x80 ; mask > 0 ; mask>>=1 ) {
+	if( data & mask ) {
+	    printf( "(*) " );
+	} else {
+	    printf( "( ) " );
+	}
+	if( mask == 0x10 ) {
+	    printf( "  " );
+	}
+    }
+    printf( "\n" );
+    
+    digital_io0 = data;
+}
+
 void HandlePortWrite01( const byte data ) { digital_io1 = data; }
 void HandlePortWrite02( const byte data ) { digital_io2 = data; }
 void HandlePortWrite03( const byte data ) { digital_io3 = data; }

@@ -7,6 +7,7 @@ all:	roms
 
 ROMDIRS := \
 	lloader \
+	selftest \
 	basic.32 \
 	basic.56 
 
