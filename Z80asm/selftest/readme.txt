@@ -1,9 +1,12 @@
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
 
 SelfTest
 v1.00
 2016-11-10
 Scott Lawrence
 yorgle@gmail.com
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
 
 This is meant to be a diagnostic tool to help track down issues
 with an RC2014 computer.  Mainly my own. ;)
@@ -22,13 +25,15 @@ And for output:
 - Digital IO, or Digital Output module at port 0x00
 - Serial module for text output, serial tests
 
+
 In the tests, "output" means "write to port 0x00"
 In the tests, "print" means "send through the 6850 serial console"
 In the tests, "get" means "get a byte from the 6850 serial console"
 In the tests, "write" means "write to RAM/ROM"
 In the tests, "read" means "read from RAM/ROM"
 
-Tests:
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+The Tests:
 
 1. Digital Output
 	Tests writing output to the Digital Output or Digital IO
@@ -41,6 +46,7 @@ Tests:
 	C. Output 0xFF
 	D. Output 0x82	(completion code)
 
+
 2. Serial Output
 	This will do an unthrottled output of a text string through
 	the serial module.
@@ -52,7 +58,6 @@ Tests:
 
 		This is test ACIA unthrottled output.
 
-	
 
 3. RAM
 	This test will write and read to bytes across memory space
@@ -90,6 +95,7 @@ Tests:
 	    02468ACE  * 0x1000  (A = RAM, O = ROM)
 	    OOOOAAAA
 
+
 4. Serial Read (Echo)
 	This test will check for serial input, by echoing back
 	every byte sent in.  If the byte is a CR or LF, then 
@@ -101,6 +107,3 @@ Tests:
 	D. Output it to the digital output/IO module
 	E. Print it back out to the terminal
 	F. Repeat forever...
-
-
-
