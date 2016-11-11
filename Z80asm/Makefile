@@ -17,18 +17,15 @@ OLDDIRS: = \
 	iotest
 
 
-roms: romdir
+roms: 
 	@echo "Building ROMs"
 	for dir in $(ROMDIRS); do \
                $(MAKE) -C $$dir; \
              done
-romdir:
-	@echo "Creating ROM directory"
-	@-mkdir $(ROMSDIR)
 
 clean:
 	@echo "Cleaning up all products"
-	-rm -rf $(ROMSDIR)
+	-rm -rf $(ROMSDIR)/*
 	for dir in $(ROMDIRS); do \
                $(MAKE) -C $$dir clean; \
              done

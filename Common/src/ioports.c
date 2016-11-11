@@ -40,7 +40,7 @@ void HandlePortWrite00( const byte data )
 {
     int mask;
 
-    printf( "DigitalIO: 0x%02x: " );
+    printf( "DigitalIO: 0x%02x: ", data );
     for( mask = 0x80 ; mask > 0 ; mask>>=1 ) {
 	if( data & mask ) {
 	    printf( "(*) " );
