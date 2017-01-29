@@ -32,33 +32,13 @@ Emulation = 1
 	jp	ColdBoot	; and do the stuff
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; RST 08 - println( "\r\n" );
-.org 0x0008 	; send out a newline
-PrintNL:
-	ld	hl, #str_crlf	; set up the newline string
-	jr	Print		
+; RST 08 ; unused
+.org 0x0008 
 
-str_crlf:
-	.byte 	0x0d, 0x0a, 0x00	; "\r\n"
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; RST 10 - println( (hl) );
+; RST 10 ; unused
 .org 0x0010
-; print
-;  hl should point to an 0x00 terminated string
-;  this will send the string out through the ACIA
-Print:
-	push	af
-to_loop:
-	ld	a, (hl)		; get the next character
-	cp	#0x00		; is it a NULL?
-	jr	z, termz	; if yes, we're done here.
-	out	(TermData), a	; send it out.
-	inc	hl		; go to the next character
-	jr	to_loop		; do it again!
-termz:
-	pop	af
-	ret			; we're done, return!
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; RST 20 - send out string to SD drive
@@ -76,7 +56,7 @@ sdz:
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; RST 28 - unused
-.org 0x0028
+.org 0x0030
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; RST 30 - unused
@@ -92,20 +72,50 @@ sdz:
 
 ; memory maps of possible hardware...
 ;  addr   	SBC	2014	LL
-; E000 - FFFF 	RAM	RAM	RAM
-; C000 - DFFF	RAM	RAM	RAM
-; A000 - BFFF	RAM	RAM	RAM
-; 8000 - 9FFF	RAM	RAM	RAM
-; 6000 - 7FFF	RAM		RAM
+
+; 0000 - 1FFF	ROM	ROM	RAOM (switchable)
+; 2000 - 3FFF	ROM	ROM	RAOM (switchable)
+;
 ; 4000 - 5FFF	RAM		RAM
-; 2000 - 3FFF	ROM	ROM	RAOM
-; 0000 - 1FFF	ROM	ROM	RAOM
+; 6000 - 7FFF	RAM		RAM
+;
+; 8000 - 9FFF	RAM	RAM	RAM
+; A000 - BFFF	RAM	RAM	RAM
+; C000 - DFFF	RAM	RAM	RAM
+; E000 - FFFF 	RAM	RAM	RAM
 
-STACK 	= 0xF800
 
-USERRAM = 0xF802
-LASTADDR = USERRAM + 1
+; We'll use the ram chunk at 8000-$8FFF for our user stuff
+STACK 	= 0x9000	; Stack starts here and goes down
 
+USERRAM = 0x8000	; User ram starts here and goes up
+
+LBUF    = USERRAM	; line buffer for the shell
+LBUFLEN = 100
+LBUFEND = LBUF + LBUFLEN
+
+LASTADDR = LBUFEND + 1
+
+	CH_NULL	 = 0x0
+	CH_BELL	 = 0x07
+	CH_NL	 = 0x0A
+	CH_CR	 = 0x0D
+	CH_SPACE = 0x20
+	CH_TAB   = 0x09
+
+	CH_BS    = 0x08
+	CH_DEL   = 0x7F
+
+	CH_CTRLU = 0x15
+
+	CH_PRLOW = 0x20
+	CH_PRHI  = 0x7E
+
+CBUF = LASTADDR		; buffer for calling a function pointer
+NEXTRAM = CBUF+6
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; console io routines
 
 GetCh:
 	in	a, (TermStatus)	; ready to read a byte?
@@ -128,7 +138,7 @@ KbHit:
 	and	#DataReady
 	ret
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; ColdBoot - the main code block
@@ -150,10 +160,393 @@ ColdBoot:
 	call	Print
 
 	; and run the main menu
-	jp	MenuMain
+	jp	Shell
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+
+; the main shell loop
+Shell:
+	call	ClearLine
+	call	Prompt
+	call	GetLine
+	call	ProcessLine
+	jr	Shell
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; shell handler routines
+
+; IsHLZero
+;	a = 0 if HL == 0x0000
+;	a = nonzero otherwise
+IsHLZero:
+	ld	a, h
+	cp	a, #0x00
+	ret	nz	 	; return the byte (nonzero)
+
+	ld	a, l
+	ret			; return the byte (nonzero)
+
+; I did have some logic in here to compare both bytes and set a 
+; return value, then i realized that if all i care about is if 
+; both bytes are zero, I just need to check the first one for 
+; zero.  If it's not, just return it.  If it is zero, then just
+; load the second byte into a, and you can use that one as the 
+; return value! 
+
+
+; process the line in memory
+ProcessLine:
+	; check for empty
+	ld	hl, #LBUF
+	ld	a, (hl)
+	cp	#CH_NULL
+	ret	z
+
+	; okay. first, let's kick off the strtok style processing
+	call 	U_NullSpace	; replaces first space with a null
+
+
+; test for now. iterate over the list
+	ld	hl, #CmdTable	; command list is structured:
+				; 00 word	int     flags (0000 for end)
+				; 02 word	char *  command
+				; 04 word  char *  info
+				; 06 word 	void (*fcn)( void )
+__plLoop:
+	; check for end of table
+	push	hl
+	call 	DerefHL
+	call	IsHLZero
+	pop	hl
+	cp	a, #0x00
+	jr	z, __plLaunch	; entry was not found, launch "what?"
+
+	; we can continue...
+	push	hl		; save current table position
+
+	; work with the table item
+
+	; make HL point to the "command" we're checking
+	ld	bc, #0x0002
+	add	hl, bc		; hl = command name
+	call	DerefHL		; dereference the string
+
+	; make DE point to the typed command
+	ld	de, #LBUF
+	call	U_Streq		; "command" == typed?
+	cp	#0x00		; equal?
+	jr	nz, __plNext	; nope
+
+	; yep!
+	pop	hl		; hl points to the complete structure now
+	jr	__plLaunch
+
+	; advance to the next item
+__plNext: 
+	pop	hl		; restore hl
+	ld	bc, #0x08
+	add	hl, bc
+	jr	__plLoop	
+
+	; launch the item!
+	; we enter here with just the ret stack
+	; hl = structure pointer
+__plLaunch:
+	call	PrintNL		; end the current line
+	call	PrintNL		; add a space
+	ld	bc, #0x06
+	add	hl, bc		; point hl at the function pointer
+	call	DerefHL		; point hl at the function!
+	; this looks weird, but it works.  we're basically doing a jump
+	; to the support function.  We're using the 'ret' mechanism to
+	; do this.  ret will set SP to the top value on the stack and
+	; pop it. so essentially this is:  "jp hl"
+	push	hl
+	ret
+
+
+	; print out the full string
+	call	PrintNL
+	ld	a, #'#
+	call	PutCh
+
+
+	; prep for argv0 (into hl)
+	call	U_NullSpace	; terminate the current token
+	push	hl
+	pop	de		; move the user command string into DE
+
+	; find argv[0] in the command table
+	ld	hl, #CmdTable	; start out the command list
+	
+	call 	DerefHL
+
+_pl0:
+	ld	a, (de)
+	cp	#CH_NULL	; check for end of list...
+	jr	z, PL_Launch	; string was a null, print 'what'
+
+	; check this one...
+	call	U_Streq		; does (de) == (hl) ?
+
+	cp	a, #0x01
+	jr	z, PL_Launch	; it's the same! launch it!
+
+	; nope.  next item
+	ld	bc, #0x06	; next item is 6 bytes away...
+	push	hl		; save aside
+	 push	de
+	 pop	hl		; hl = de
+	 add	hl, bc		; hl = hl + 6 (next item)
+	 push	hl
+	 pop	de		; de = hl
+	pop	hl		; restore hl
+
+	jr	_pl0
+
+
+; DerefHL
+;	visit the address at HL, and take the data there (16 bit) and
+;	shove it back into HL.
+;	only HL will be modified
+DerefHL:
+	push	bc
+	ld	c, (hl)
+	inc	hl
+	ld	b, (hl)	
+	push	bc
+	pop	hl
+	pop	bc
+	ret
+	
+
+PL_Launch:
+	ld	bc, #0x04	; get the function pointer
+	push	hl		; save aside
+	 push	de
+	 pop	hl		; hl = de
+	 add	hl, bc		; hl = hl + 4 (fcn pointer)
+	 push	hl
+	 pop	de		; de = hl
+	pop	hl		; restore hl
+
+	push	hl
+	call	DerefHL
+	ex	de, hl
+	pop	hl
+	
+
+	; so now, theoretically, DE contains the function pointer
+	; let's prep our memory for what we need to do.
+	; the call is:
+	;	call	(de)
+	;	ret
+	ld	a, #0xcd
+	ld	(CBUF), a	; call
+	ld	a, e
+	ld	(CBUF+1), a	;       e
+	ld	a, d
+	ld	(CBUF+2), a	;      d
+	ld	a, #0xc9
+	ld	(CBUF+3), a	; ret
+
+	jp	CBUF
+	ret
+stub:
+	call	#0x1122
+	ret
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; display the shell prompt
+str_prompt:
+	.asciz  "L2> "
+Prompt:
+	call	PrintNL
+	ld	hl, #str_prompt
+	call	Print
+	ret
+	
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; command list
+
+; this is a list of pointers to a structure of 3 elements.
+;	word	flags 
+;	word	char * - address of zero-terminated string of function name
+;	word	char * - address of zero-terminated info string
+;	word	void (*fcn)(void) - address of handler function to call
+
+CMDEntry	= 0x0001
+CMDEntry	= 0x0001
+CMDEnd		= 0x0000	; all zeroes. important
+
+CmdTable:
+	.word	CMDEntry, cArgs, iArgs, fArgs	; 'args'
+	.word	CMDEntry, cHelp, iHelp, fHelp	; 'help'
+	.word	CMDEntry, cHelp2, iHelp, fHelp	; '?'
+.if( Emulation )
+	.word	CMDEntry, cQuit, iQuit, fQuit	; 'quit'
+.endif
+	.word	CMDEnd, 0, 0, fWhat		; (EOL)
+
+; arbitrary port connection (term)
+; arbitrary ram go
+
+
+
+.if( Emulation )
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; 'quit' - quit out of the emulation
+cQuit: 	.asciz	"quit"
+iQuit: 	.asciz	"Exit the emulator"
+fQuit:
+	;;;;;;;;;;;;;;;
+	; quit from the rom (halt)
+	ld	a, #0xF0	; F0 = flag to exit
+	out	(EmulatorControl), a
+	halt			; rc2014sim will exit on a halt
+
+.endif
+	
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; 'help'
+
+cHelp: 	.asciz	"help"
+cHelp2:	.asciz	"?"
+iHelp: 	.asciz	"Get help on Lloader2"
+fHelp:
+	ld	hl, #str_help
+	call	Print
+	; iterate over the list
+
+	ld	hl, #CmdTable
+	push	hl		; start with the stored HL at the cmd table
+
+__fhLoop:
+	pop	hl
+	push	hl		; restore HL
+
+	; check for end of loops
+	call 	DerefHL
+	call	IsHLZero
+	cp	#0x00
+	jr	z, __fhRet
+
+	; prefix the line
+
+	ld	a, #CH_SPACE
+	call	PutCh		; "   "
+	call	PutCh
+	call	PutCh
+
+	; print the command name
+	pop	hl
+	push	hl		; restore HL
+	ld	bc, #0x02	; ... 
+	add	hl, bc		; ...command name ptr
+	call 	DerefHL		; command name
+
+	call	Print		; "   CMD"
+
+	; add a bit of space
+	ld	a, #CH_TAB
+	call	PutCh
+	ld	a, #CH_SPACE
+	call	PutCh
+	call	PutCh
+	
+	pop	hl
+	push	hl		; restore HL
+	ld	bc, #0x04
+	add	hl, bc		; ...info ptr
+	call	DerefHL		; info
+	call	Print		; "   CMD\t   Info"
+
+	call	PrintNL		; "   CMD\t   Info\n\r"
+	
+	; advance stored HL to the next item
+	pop	hl
+	ld	bc, #0x0008
+	add	hl, bc
+	push	hl
+	jr	__fhLoop
+
+__fhRet:
+	pop	hl		; restore the stack
+	ret
+	
+str_pre:
+	.asciz  "   "
+str_help:
+	.asciz	"List of available commands:\n\r"
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; 'args' tester
+cArgs:	.asciz	"args"
+iArgs:	.asciz	"test display of args"
+fArgs:
+	ld	e, #'0		; printable argc
+	call	__faCInc	; display and inc argc
+	
+	ld	hl, #LBUF	; restore the arg pointer to HL
+	push	hl
+	call	__printhl	; print the token
+	pop	hl
+
+__faLoop:
+	call	U_NextToken	; go to the next token
+	ld	a, (hl)
+	cp	#CH_NULL	; end of the array?
+	ret	z		; return if we're done with the string
+
+	call	__faCInc	; display and inc argc
+
+	call	U_NullSpace	; terminate the current token
+	call	__printhl	; print the token
+
+	jr	__faLoop	; repeat
+	ret
+
+__faCInc:
+	ld	a, #'[
+	call	PutCh
+
+	ld	a, e
+	call	PutCh
+	inc	a
+	ld	e, a
+
+	ld	a, #']
+	call	PutCh
+	ld	a, #CH_SPACE
+	call	PutCh
+	ret
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; unknown command
+
+fWhat:
+	push	hl
+	call	PrintNL
+	ld	hl, #0$
+	call	Print
+	pop	hl
+	ret
+
+0$:
+	.asciz	"What?\r\n"
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+
+
+.if 0
 
 str_prompt:
 	.asciz  "LL> "
@@ -1015,8 +1408,19 @@ str_dir:
 	.asciz 	"  Dir: "
 str_file:
 	.asciz 	" File: "
+.endif
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Text strings
 
+; Version history
+;   v020 2017-01-21 - First Lloader2
+;   v001 - v011     - Lloader 1 versions.
+
+str_splash:
+	.ascii	"Lloader2 Shell for RC2014/LL MicroLlama\r\n"
+	.ascii	"  v020 2017-Jan-21  Scott Lawrence\r\n"
+	.asciz  "\r\n"
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; functionality includes
@@ -1027,5 +1431,7 @@ str_file:
 .include "ports.asm"
 .include "input.asm"
 .include "print.asm"
+.include "utils.asm"
+	.module Lloader ; END
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

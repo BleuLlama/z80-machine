@@ -8,3 +8,8 @@ notes.txt
 *.swp
 .DS_Store
 typescript
+
+rc2014/ROMs
+rc2014LL/ROMs
+rc2014LL/SD_Disk
+rc2014SB/ROMs
