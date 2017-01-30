@@ -210,6 +210,11 @@ __plLoop:
 	; we can continue...
 	push	hl		; save current table position
 
+	; check for command-only
+	cp	a, #0x01	; command
+	jr	nz, __plNext	; skip if not a command
+
+
 	; work with the table item
 
 	; make HL point to the "command" we're checking
