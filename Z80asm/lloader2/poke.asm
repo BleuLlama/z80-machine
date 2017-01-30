@@ -1,7 +1,7 @@
 ; Poke
-;          Poke memory values
+;          Poke memory values, run RAM
 ;
-;          2016-06-15 Scott Lawrence
+;          2016,2017 Scott Lawrence
 ;
 ;  This code is free for any use. MIT License, etc.
 
@@ -9,8 +9,11 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-; PokeMemory
+cPoke:	.asciz	"poke"
+iPoke:	.asciz	"Write data to memory"
 
+; PokeMemory
+fPoke:
 PokeMemory:
 	ld	hl, #str_address
 	call	Print
@@ -42,3 +45,35 @@ PM_nlret:
 	xor	a
 	ret
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+cGo:	.asciz	"go"
+iGo:	.asciz	"Start execution at a specific address"
+fGo:
+	ld	hl, #str_address
+	call	Print
+	call	GetWordFromUser
+	cp	a, #0xff
+	ret	z		; user escaped
+
+	; push the address from the user back onto the stack (return location)
+	push	de
+	ret
+
+
+.if 0
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; test
+;	just a simple thing to jump into to test the 'go' function
+test:
+	halt
+	ld	sp, #0x9000
+	ld	hl, #str_testworked
+	call	Print
+	jr	.
+	halt
+
+str_testworked:
+	.asciz	"\r\n\r\nHello, world!\r\n"
+.endif

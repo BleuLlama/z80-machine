@@ -9,6 +9,10 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+cIn:	.asciz	"in"
+iIn:	.asciz	"Input data from arbitrary port"
+fIn:
+
 ; InPort
 ;	read in the specified port and print it out
 InPort:
@@ -31,6 +35,12 @@ InPort:
 	xor	a
 	ret			; next
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+cOut:	.asciz	"out"
+iOut:	.asciz	"Output data to arbitrary port"
+fOut:
+
 ; OutPort
 ;	output the specified byte to the specified port
 OutPort:
@@ -48,7 +58,6 @@ OutPort:
 	out	(c),a		; send it out
 	call	PrintNL
 
-	xor	a
 	ret
 
 
@@ -67,6 +76,9 @@ str_spaces:
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+cTerm:	.asciz	"term"
+iTerm:	.asciz	"Open $C0 for ascii communications"
+
 ; Terminal app
 ;  Opens the SD port, and sends stuff to and fro
 
@@ -77,10 +89,12 @@ str_intro:
 str_outro:
 	.asciz	"\n\rTerminated connection\n\r"
 
+fTerm:
 TerminalApp:
 	ld	hl, #str_intro
 	call	Print
 
+	; temp junk
 	ld 	a, #'~
 	out	(SDData),a
 	ld 	a, #'0

@@ -9,6 +9,9 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+cMMap:	.asciz	"mmap"
+iMMap:	.asciz	"Detect RAM/ROM in system"
+
 ; memory maps of possible hardware...
 ;  addr   	SBC	2014	LL
 ; E000 - FFFF 	RAM	RAM	RAM
@@ -22,6 +25,7 @@
 
 	;;;;;;;;;;;;;;;
 	; send the memory map out to the console
+fMMap:
 ShowMemoryMap:
 	ld	hl, #str_memheader
 	call	Print

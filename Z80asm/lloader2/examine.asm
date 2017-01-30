@@ -9,6 +9,9 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+
+cExa:	.asciz	"exa"
+iExa:	.asciz	"Examine contents of RAM"
 str_exa_prompt:
 	.asciz	"\r\n [q]uit, SP more, [x] addr> "
 
@@ -23,6 +26,7 @@ ExaInit:
 ;;;;;;;;;;;;;;;;;;;;
 ; ExaMem
 ;  prompt the user for what they want to do
+fExa:
 ExaMem:
 	ld	hl, #str_exa_prompt
 	call	Print

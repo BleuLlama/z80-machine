@@ -1,4 +1,4 @@
-; Lloader
+; Lloader 2
 ;          Core Rom Loader for RC2014-LL / MicroLlama 5000
 ;
 ;          2016-05-09 Scott Lawrence
@@ -159,6 +159,9 @@ ColdBoot:
 	ld	hl, #str_splash
 	call	Print
 
+	; initialize any subapps
+	call	ExaInit
+
 	; and run the main menu
 	jp	Shell
 
@@ -174,28 +177,8 @@ Shell:
 	jr	Shell
 
 
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; shell handler routines
-
-; IsHLZero
-;	a = 0 if HL == 0x0000
-;	a = nonzero otherwise
-IsHLZero:
-	ld	a, h
-	cp	a, #0x00
-	ret	nz	 	; return the byte (nonzero)
-
-	ld	a, l
-	ret			; return the byte (nonzero)
-
-; I did have some logic in here to compare both bytes and set a 
-; return value, then i realized that if all i care about is if 
-; both bytes are zero, I just need to check the first one for 
-; zero.  If it's not, just return it.  If it is zero, then just
-; load the second byte into a, and you can use that one as the 
-; return value! 
-
 
 ; process the line in memory
 ProcessLine:
@@ -268,97 +251,6 @@ __plLaunch:
 	ret
 
 
-	; print out the full string
-	call	PrintNL
-	ld	a, #'#
-	call	PutCh
-
-
-	; prep for argv0 (into hl)
-	call	U_NullSpace	; terminate the current token
-	push	hl
-	pop	de		; move the user command string into DE
-
-	; find argv[0] in the command table
-	ld	hl, #CmdTable	; start out the command list
-	
-	call 	DerefHL
-
-_pl0:
-	ld	a, (de)
-	cp	#CH_NULL	; check for end of list...
-	jr	z, PL_Launch	; string was a null, print 'what'
-
-	; check this one...
-	call	U_Streq		; does (de) == (hl) ?
-
-	cp	a, #0x01
-	jr	z, PL_Launch	; it's the same! launch it!
-
-	; nope.  next item
-	ld	bc, #0x06	; next item is 6 bytes away...
-	push	hl		; save aside
-	 push	de
-	 pop	hl		; hl = de
-	 add	hl, bc		; hl = hl + 6 (next item)
-	 push	hl
-	 pop	de		; de = hl
-	pop	hl		; restore hl
-
-	jr	_pl0
-
-
-; DerefHL
-;	visit the address at HL, and take the data there (16 bit) and
-;	shove it back into HL.
-;	only HL will be modified
-DerefHL:
-	push	bc
-	ld	c, (hl)
-	inc	hl
-	ld	b, (hl)	
-	push	bc
-	pop	hl
-	pop	bc
-	ret
-	
-
-PL_Launch:
-	ld	bc, #0x04	; get the function pointer
-	push	hl		; save aside
-	 push	de
-	 pop	hl		; hl = de
-	 add	hl, bc		; hl = hl + 4 (fcn pointer)
-	 push	hl
-	 pop	de		; de = hl
-	pop	hl		; restore hl
-
-	push	hl
-	call	DerefHL
-	ex	de, hl
-	pop	hl
-	
-
-	; so now, theoretically, DE contains the function pointer
-	; let's prep our memory for what we need to do.
-	; the call is:
-	;	call	(de)
-	;	ret
-	ld	a, #0xcd
-	ld	(CBUF), a	; call
-	ld	a, e
-	ld	(CBUF+1), a	;       e
-	ld	a, d
-	ld	(CBUF+2), a	;      d
-	ld	a, #0xc9
-	ld	(CBUF+3), a	; ret
-
-	jp	CBUF
-	ret
-stub:
-	call	#0x1122
-	ret
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ; display the shell prompt
@@ -381,37 +273,35 @@ Prompt:
 ;	word	void (*fcn)(void) - address of handler function to call
 
 CMDEntry	= 0x0001
-CMDEntry	= 0x0001
 CMDEnd		= 0x0000	; all zeroes. important
 
 CmdTable:
-	.word	CMDEntry, cArgs, iArgs, fArgs	; 'args'
-	.word	CMDEntry, cHelp, iHelp, fHelp	; 'help'
-	.word	CMDEntry, cHelp2, iHelp, fHelp	; '?'
-.if( Emulation )
-	.word	CMDEntry, cQuit, iQuit, fQuit	; 'quit'
-.endif
-	.word	CMDEnd, 0, 0, fWhat		; (EOL)
+	.word	CMDEntry, cArgs, iArgs, fArgs		; 'args'
+	.word	CMDEntry, cHelp, iHelp, fHelp		; 'help'
+	.word	CMDEntry, cHelp2, iHelp, fHelp		; '?'
+	.word	CMDEntry, cVer, iVer, fVer		; 'ver'
+	.word	CMDEntry, cTerm, iTerm, fTerm		; 'term'
 
-; arbitrary port connection (term)
+	.word	CMDEntry, cIn, iIn, fIn			; 'in'
+	.word	CMDEntry, cOut, iOut, fOut		; 'out'
+
+	.word	CMDEntry, cMMap, iMMap, fMMap		; 'mmap'
+	.word	CMDEntry, cPoke, iPoke, fPoke		; 'poke"
+	.word	CMDEntry, cExa, iExa, fExa		; 'exa"
+
+	.word	CMDEntry, cRom2Ram, iRom2Ram, fRom2Ram	; 'rom2ram'
+	.word	CMDEntry, cRomDis, iRomDis, fRomDis	; 'romdis'
+	.word	CMDEntry, cRomEn, iRomEn, fRomEn	; 'romen'
+
+	.word	CMDEntry, cGo, iGo, fGo			; 'go'
+
+.if( Emulation )
+	.word	CMDEntry, cQuit, iQuit, fQuit		; 'quit'
+.endif
+	.word	CMDEnd, 0, 0, fWhat			; (EOL, bad cmd)
+
+
 ; arbitrary ram go
-
-
-
-.if( Emulation )
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; 'quit' - quit out of the emulation
-cQuit: 	.asciz	"quit"
-iQuit: 	.asciz	"Exit the emulator"
-fQuit:
-	;;;;;;;;;;;;;;;
-	; quit from the rom (halt)
-	ld	a, #0xF0	; F0 = flag to exit
-	out	(EmulatorControl), a
-	halt			; rc2014sim will exit on a halt
-
-.endif
-	
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; 'help'
@@ -488,6 +378,8 @@ str_help:
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; 'args' tester
+;	print out all of the args
+;	an example of using the NextToken and NullSpace "strtok" equivalent
 cArgs:	.asciz	"args"
 iArgs:	.asciz	"test display of args"
 fArgs:
@@ -530,377 +422,45 @@ __faCInc:
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; unknown command
+;	this stub is called as the function when no other matche
 
 fWhat:
-	push	hl
-	call	PrintNL
 	ld	hl, #0$
 	call	Print
-	pop	hl
 	ret
 
 0$:
 	.asciz	"What?\r\n"
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-
-
-
-.if 0
-
-str_prompt:
-	.asciz  "LL> "
-
-str_menu:
-	.ascii	"== Menu ==\r\n"
-	.ascii	"  [B] boot.hex\r\n"
-	.ascii	"  [C] cpm.hex\r\n"
-	.ascii	"  [3] basic32.hex\r\n"
-	.ascii	"  [5] basic56.hex\r\n"
-	.ascii  "\r\n"
-	.ascii	"  [A] applications\r\n"
-	.ascii	"  [F] files\r\n"
-	.ascii	"  [R] ROM\r\n"
-	.ascii	"  [D] debug\r\n"
-.if( Emulation )
-	.ascii	"  [Q] quit emulator\r\n"	; should remove for burnable ROM
-.endif
-	.ascii	"  [?] print menu\r\n"
-	.byte	0x00
-
-	;;;;;;;;;;;;;;;;;;;;	
-	; display menu, get command
-MenuMain:
-	ld	hl, #str_menu
-	call	Print
-
-MM_prompt:
-	call	PrintNL
-	ld	hl, #str_prompt
-	call	Print
-
-	call	GetCh		; get user input
-	call	PutCh		; echo it out
-	call	PrintNL
-
-	; handle the passed in byte...
-
-		; General commands
-	cp	#'?		; '?' - help
-	jp	z, MenuMain
-	cp	#'/		; '?' - help
-	jp	z, MenuMain
-
-
-	cp	#'3
-	call	z, DoBootBasic32
-
-	cp	#'5
-	call	z, DoBootBasic56
-
-	call	ToUpper
-
-	cp	#'C
-	call	z, DoBootCPM
-
-.if( Emulation )
-	cp	#'Q		; 'Q' - quit the emulator
-	jp	z, Quit
-.endif
-
-	cp	#'B
-	call 	z, DoBoot
-
-
-	cp	#'A
-	call	z, MenuApps
-
-	cp	#'F
-	call	z, MenuFiles
-
-	cp	#'R
-	call	z, MenuROM
-
-	cp	#'D
-	call	z, MenuDebug
-
-	jr	MM_prompt
-
-	; helper to return with a==0
-ClrARet:
-	xor	a
-	ret
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-str_menuD: ;Debug Menu
-	.ascii  "== Debug ==\r\n"
-	.ascii	"  [E] examine memory\r\n"
-	.ascii	"  [P] poke memory\r\n"
-	.ascii  "  [I] in from port\r\n"
-	.ascii  "  [O] out to port\r\n"
-	.ascii	"  [X] exit this menu\r\n"
-	.byte	0x00
-
-str_MDprompt:
-	.asciz	"DBG "
-
-MenuDebug:
-	ld	hl, #str_menuD
-	call	Print
-MD_prompt:
-	call	PrintNL
-	ld	hl, #str_MDprompt
-	call	Print
-	ld	hl, #str_prompt
-	call	Print
-
-	call	GetCh
-	call	PutCh
-	call	PrintNL
-
-	cp	#'?
-	jp	z, MenuDebug
-	cp	#'/
-	jp	z, MenuDebug
-
-	call	ToUpper
-
-	cp	#'X
-	jp	z, ClrARet
-
-	cp	#'E
-	call	z, ExaMem
-
-	cp	#'P
-	call	z, PokeMemory
-
-	cp	#'I
-	call	z, InPort
-
-	cp	#'O
-	call	z, OutPort
-
-	jr	MD_prompt
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-str_menuR: ; ROM menu
-	.ascii  "== ROM ==\r\n"
-	.ascii	"  [S] show RAM/ROM config\r\n"
-	.ascii	"  [C] copy ROM to RAM\r\n"
-	.ascii	"  [D] disable ROM\r\n"
-	.ascii	"  [E] enable ROM\r\n"
-	.ascii	"  [X] exit this menu\r\n"
-	.byte	0x00
-
-str_MRprompt:
-	.asciz	"ROM "
-
-MenuROM:
-	ld	hl, #str_menuR
-	call	Print
-MR_prompt:
-	call	PrintNL
-	ld	hl, #str_MRprompt
-	call	Print
-	ld	hl, #str_prompt
-	call	Print
-
-	call	GetCh
-	call	PutCh
-	call	PrintNL
-
-	cp	#'?
-	jp	z, MenuROM
-	cp	#'/
-	jp	z, MenuROM
-
-	call	ToUpper
-
-	cp	#'X
-	jp	z, ClrARet
-
-	cp	#'S
-	call 	z, ShowMemoryMap
-
-	cp	#'C
-	call	z, CopyROMToRAM
-
-	cp	#'D
-	call	z, DisableROM
-
-	cp	#'E
-	call	z, EnableROM
-
-	jr	MR_prompt
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-str_menuF: 
-	.ascii  "== Files ==\r\n"
-	.ascii  "  [D] directory listing\r\n"
-	.ascii	"  [I] SD info\r\n"
-	.ascii  "  [R] SD:readme.txt\r\n"
-	.ascii	"  [X] exit this menu\r\n"
-	.byte	0x00
-
-str_FILEprompt:
-	.asciz	"FILE "
-
-MenuFiles:
-	ld	hl, #str_menuF
-	call	Print
-MF_prompt:
-	call	PrintNL
-	ld	hl, #str_FILEprompt
-	call	Print
-	ld	hl, #str_prompt
-	call	Print
-
-	call	GetCh
-	call	PutCh
-	call	PrintNL
-
-	cp	#'?
-	jp	z, MenuFiles
-	cp	#'/
-	jp	z, MenuFiles
-
-	call	ToUpper
-
-	cp	#'X
-	jp	z, ClrARet
-
-	cp	#'D
-	call	z, directoryList
-
-	cp	#'R
-	call	z, catReadme
-
-	cp	#'I
-	call	z, sdInfo
-
-	jr	MF_prompt
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-str_menuA:
-	.ascii  "== Applications ==\r\n"
-	.ascii  "  [T] terminal $C0\r\n"
-	.ascii	"  [X] exit this menu\r\n"
-	.byte	0x00
-
-str_Aprompt:
-	.asciz	"PORT "
-
-MenuApps:
-	ld	hl, #str_menuA
-	call	Print
-MA_prompt:
-	call	PrintNL
-	ld	hl, #str_Aprompt
-	call	Print
-	ld	hl, #str_prompt
-	call	Print
-
-	call	GetCh
-	call	PutCh
-	call	PrintNL
-
-	cp	#'?
-	jp	z, MenuApps
-	cp	#'/
-	jp	z, MenuApps
-
-	call	ToUpper
-
-	cp	#'X
-	jp	z, ClrARet	; exit. return
-
-	cp 	#'T
-	call	z, TerminalApp
-
-	jr	MA_prompt
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-.if( Emulation )
-	;;;;;;;;;;;;;;;
-	; quit from the rom (halt)
-Quit:
-	ld	a, #0xF0	; F0 = flag to exit
-	out	(EmulatorControl), a
-	halt			; rc2014sim will exit on a halt
-.endif
-
-	;;;;;;;;;;;;;;;
-	; show sysinfo subroutine
-ShowSysInfo:
+; ver
+
+cVer:	.asciz	"ver"
+iVer:	.asciz	"Display version information"
+fVer:
 	ld	hl, #str_splash
 	call	Print
-
-	xor	a
 	ret
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+.if 0
+	call	z, DoBootBasic32
+	call	z, DoBootBasic56
+	call	z, DoBootCPM
+	call 	z, DoBoot
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	call	z, CopyROMToRAM
+	call	z, DisableROM
+	call	z, EnableROM
 
-; CopyROMToRAM
-;	copies $0000 thru $2000 to itself
-;	seems like it would do nothing but it's reading from 
-;	the ROM and writing to the RAM
-;	Not sure if this is useful, but it's a good test.
-CopyROMToRAM:
-	ld	hl, #str_Working
-	call	Print
+	call	z, directoryList
+	call	z, catReadme
+	call	z, sdInfo
 
-	xor	a
-	ld	h, a
-	ld	l, a	; HL = $0000
-CR2Ra:
-	ld	a, (hl)
-	ld	(hl), a	; RAM[ hl ] = ROM[ hl ]
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-	inc	hl	; hl++
-	ld	a, h	; a = h
-	cp	#0x20	; is HL == 0x20 0x00?
-	jr	nz, CR2Ra
-
-	; now patch the RAM image of the ROM so if we reset, it will
-	; continue to be in RAM mode...
-	ld	hl, #ColdBoot	; 0x3E  (ld a,      )
-	inc	hl		; 0x00	(    , #0x00)
-	ld	a, #0x01	; disable RAM value
-	ld	(hl), a		; change the opcode to  "ld a, #0x01"
-	
-	; we're done. return
-	ld	hl, #str_Done
-	call	Print
-	xor	a
-	ret
-
-
-; DisableROM
-;	set the ROM disable flag
-DisableROM:
-	ld	a, #01
-	out	(RomDisable), a
-	xor	a
-	ret
-
-
-; EnableROM
-;	clear the ROM disable flag
-EnableROM:
-	xor	a
-	out	(RomDisable), a
-	xor	a
-	ret
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 	;;;;;;;;;;;;;;;
 	; boot roms
@@ -1362,7 +922,7 @@ directoryList:
 
 str_splash:
 	.ascii	"Lloader Shell for RC2014/LL MicroLlama\r\n"
-	.ascii	"  v011 2016-Oct-23  Scott Lawrence\r\n"
+	.ascii	"  v020 2017-Jan-29  Scott Lawrence\r\n"
 	.asciz  "\r\n"
 	
 cmd_getinfo:
@@ -1385,12 +945,6 @@ str_loaded:
 
 str_nofile:
 	.asciz	"Couldn't load hex file.\n\r"
-
-str_Working:
-	.asciz	"Working.."
-
-str_Done:
-	.asciz	"..Done!\r\n"
 
 str_line:
 	.asciz	"--------------\n\r"
@@ -1422,9 +976,16 @@ str_splash:
 	.ascii	"  v020 2017-Jan-21  Scott Lawrence\r\n"
 	.asciz  "\r\n"
 
+str_Working:
+	.asciz	"Working.."
+
+str_Done:
+	.asciz	"..Done!\r\n"
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; functionality includes
 
+.include "llhw.asm"
 .include "memprobe.asm"
 .include "examine.asm"
 .include "poke.asm"
