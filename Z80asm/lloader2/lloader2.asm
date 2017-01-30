@@ -272,33 +272,45 @@ Prompt:
 ;	word	char * - address of zero-terminated info string
 ;	word	void (*fcn)(void) - address of handler function to call
 
-CMDEntry	= 0x0001
+CMDEntry	= 0x0001	; command to use
+CMDHeader	= 0x0002	; just a header. skip for command lists
 CMDEnd		= 0x0000	; all zeroes. important
 
 CmdTable:
+	.word	CMDHeader, cHSys, 0, 0
 	.word	CMDEntry, cArgs, iArgs, fArgs		; 'args'
 	.word	CMDEntry, cHelp, iHelp, fHelp		; 'help'
 	.word	CMDEntry, cHelp2, iHelp, fHelp		; '?'
 	.word	CMDEntry, cVer, iVer, fVer		; 'ver'
+.if( Emulation )
+	.word	CMDEntry, cQuit, iQuit, fQuit		; 'quit'
+.endif
+
+	.word	CMDHeader, cHApps, 0, 0
+	.word	CMDEntry, cGo, iGo, fGo			; 'go'
 	.word	CMDEntry, cTerm, iTerm, fTerm		; 'term'
 
+	.word	CMDHeader, cHPort, 0, 0
 	.word	CMDEntry, cIn, iIn, fIn			; 'in'
 	.word	CMDEntry, cOut, iOut, fOut		; 'out'
 
+	.word	CMDHeader, cHRAM, 0, 0
+	.word	CMDEntry, cExa, iExa, fExa		; 'exa"
 	.word	CMDEntry, cMMap, iMMap, fMMap		; 'mmap'
 	.word	CMDEntry, cPoke, iPoke, fPoke		; 'poke"
-	.word	CMDEntry, cExa, iExa, fExa		; 'exa"
 
+	.word	CMDHeader, cHROM, 0, 0
 	.word	CMDEntry, cRom2Ram, iRom2Ram, fRom2Ram	; 'rom2ram'
 	.word	CMDEntry, cRomDis, iRomDis, fRomDis	; 'romdis'
 	.word	CMDEntry, cRomEn, iRomEn, fRomEn	; 'romen'
 
-	.word	CMDEntry, cGo, iGo, fGo			; 'go'
-
-.if( Emulation )
-	.word	CMDEntry, cQuit, iQuit, fQuit		; 'quit'
-.endif
 	.word	CMDEnd, 0, 0, fWhat			; (EOL, bad cmd)
+
+cHSys:	.asciz	"--- System ---"
+cHApps:	.asciz	"--- Applications ---"
+cHPort:	.asciz	"--- Port I/O Utils ---"
+cHRAM:	.asciz	"--- RAM Utils ---"
+cHROM:	.asciz	"--- ROM Utils ---"
 
 
 ; arbitrary ram go
@@ -327,8 +339,28 @@ __fhLoop:
 	cp	#0x00
 	jr	z, __fhRet
 
-	; prefix the line
+	; check what kind of entry it is
+	cp	a, #0x01	; command entry
+	jr	z, __fhCmd
 
+	cp	a, #0x02	; header entry
+	jr	z, __fhHdr
+
+	jr	__fhNext	; Dunno. skip
+
+__fhHdr:
+	pop	hl
+	push	hl		; restore HL
+	ld	bc, #0x02	; ...
+	add	hl, bc		; ... header text pointer
+	call	DerefHL		; header tet
+	call	PrintNL
+	call	Print
+	call	PrintNL
+	jr	__fhNext	; continue on the next one
+
+__fhCmd:
+	; prefix the line
 	ld	a, #CH_SPACE
 	call	PutCh		; "   "
 	call	PutCh
@@ -359,6 +391,7 @@ __fhLoop:
 
 	call	PrintNL		; "   CMD\t   Info\n\r"
 	
+__fhNext:
 	; advance stored HL to the next item
 	pop	hl
 	ld	bc, #0x0008
