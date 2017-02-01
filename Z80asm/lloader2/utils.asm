@@ -188,6 +188,7 @@ _seqRet:
 	ret
 	
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; NullSpace
 ;	null out the next whitespace (' ') (or null)
 ;	destructive to the data, returns hl intact
@@ -235,7 +236,19 @@ _nxt2:
 _nxtRet:
 	ret
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; IsNextToken
+;	HL MUST point to the string in-parse
+;	returns 0 if no more tokens, non zero if there's another (in 'a')
+U_IsNextToken::
+	push	hl
+	call	U_NextToken
+	; we're either pointing at a NULL or a character
+	; either way, we have our return values.
+	pop	hl
+	ret
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; IsHLZero
 ;       a = 0 if HL == 0x0000
 ;       a = nonzero otherwise
@@ -269,6 +282,4 @@ DerefHL:
         pop     hl
         pop     bc
         ret
-
-
 

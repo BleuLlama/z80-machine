@@ -1,7 +1,7 @@
 ; Lloader 2
 ;          Core Rom Loader for RC2014-LL / MicroLlama 5000
 ;
-;          2016-05-09 Scott Lawrence
+;          2016,2017 Scott Lawrence
 ;
 ;  This code is free for any use. MIT License, etc.
 ;
@@ -309,13 +309,26 @@ CmdTable:
 	.word	CMDEntry, cRomDis, iRomDis, fRomDis	; 'romdis'
 	.word	CMDEntry, cRomEn, iRomEn, fRomEn	; 'romen'
 
+	.word	CMDHeader, cHFile, 0, 0
+	.word	CMDEntry, cInfo, iInfo, fInfo		; 'finfo'
+	.word	CMDEntry, cRtxt, iRtxt, fRtxt		; 'freadme'
+	.word	CMDEntry, cDir, iDir, fDir		; 'fdir'
+
+	.word	CMDHeader, cHBoot, 0, 0
+	.word	CMDEntry, cCPM, iCPM, fCPM		; 'bcpm'
+	.word	CMDEntry, cBasic32, iBasic32, fBasic32	; 'b32'
+	.word	CMDEntry, cBasic56, iBasic56, fBasic56	; 'b56'
+
 	.word	CMDEnd, 0, 0, fWhat			; (EOL, bad cmd)
 
+; some header text:
 cHSys:	.asciz	"--- System ---"
 cHApps:	.asciz	"--- Applications ---"
 cHPort:	.asciz	"--- Port I/O Utils ---"
 cHRAM:	.asciz	"--- RAM Utils ---"
 cHROM:	.asciz	"--- ROM Utils ---"
+cHFile:	.asciz	"--- Files ---"
+cHBoot:	.asciz	"--- Boot ---"
 
 
 ; arbitrary ram go
@@ -483,35 +496,24 @@ fVer:
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-.if 0
-	call	z, DoBootBasic32
-	call	z, DoBootBasic56
-	call	z, DoBootCPM
-	call 	z, DoBoot
-
-	call	z, CopyROMToRAM
-	call	z, DisableROM
-	call	z, EnableROM
-
-	call	z, directoryList
-	call	z, catReadme
-	call	z, sdInfo
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-
 	;;;;;;;;;;;;;;;
 	; boot roms
 
-DoBootCPM:
+cCPM:		.asciz	"bcpm"
+iCPM:		.asciz	"Boot CP/M"
+fCPM:
 	ld	hl, #cmd_bootCPM
 	jr	DoBootB	
 
-DoBootBasic32:
+cBasic32:	.asciz	"b32"
+iBasic32:	.asciz	"Boot 32k Nascom BASIC"
+fBasic32:
 	ld	hl, #cmd_bootBasic32
 	jr	DoBootB	
 
-DoBootBasic56:
+cBasic56:	.asciz	"b56"
+iBasic56:	.asciz	"Boot 56k Nascom BASIC"
+fBasic56:
 	ld	hl, #cmd_bootBasic56
 	jr	DoBootB	
 
@@ -914,54 +916,41 @@ DecodeCatWithLines:
 	ret
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+;	call	z, directoryList
+;	call	z, catReadme
+;	call	z, sdInfo
 
-sdInfo:
+
+cInfo:	.asciz	"finfo"
+iInfo:	.asciz	"SSDD1 display card info"
+fInfo:
 	ld	hl, #cmd_info
 
 	call	SendSDCommand
 	call	RawCatWithLines
-
-	xor	a
 	ret
 
-
-catReadme:
+cRtxt:	.asciz	"freadme"
+iRtxt:	.asciz	"SSDD1 cat readme.txt"
+fRtxt:
 	ld	hl, #str_filereadme; select file
 	call	SendSDCommand
 	call	DecodeCatWithLines
-
-	xor	a
 	ret
 
-
-directoryList:
+cDir:	.asciz	"fdir"
+iDir:	.asciz	"SSDD1 directory listing of SD:"
+fDir:
 	ld	hl, #cmd_directory
 	call	SendSDCommand
 	call	DecodeCatWithLines
-
-	xor	a
 	ret
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Text strings
 
-; Version history
-;   v011 2016-10-23 - New decoder working for directory, files
-;   v010 2016-10-13 - Working on Terminal, added ~I, Directory
-;   v009 2016-10-11 - Internal support for hex, new SD interface
-;   v008 2016-09-28 - Terminal fixed, new file io command strings
-;   v007 2016-07-14 - Menu rearrange, better Hexdump
-;   v006 2016-07-07 - SD load and boot working again
-;   v005 2016-06-16 - New menus?
-;   v004 2016-06-11 - Hex dump of memory, in, out, poke
-;   v003            - more options
-;   v002 2016-05-10 - usability cleanups
-;   v001 2016-05-09 - initial version, functional
 
-str_splash:
-	.ascii	"Lloader Shell for RC2014/LL MicroLlama\r\n"
-	.ascii	"  v020 2017-Jan-29  Scott Lawrence\r\n"
-	.asciz  "\r\n"
 	
 cmd_getinfo:
 	.asciz  "\n~0:I\n"
@@ -1000,14 +989,25 @@ str_dir:
 	.asciz 	"  Dir: "
 str_file:
 	.asciz 	" File: "
-.endif
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Text strings
 
 ; Version history
-;   v020 2017-01-21 - First Lloader2
-;   v001 - v011     - Lloader 1 versions.
+;   v020 2017-01-31 - Lloder 2 with shell interface
+;	-
+;   v011 2016-10-23 - New decoder working for directory, files
+;   v010 2016-10-13 - Working on Terminal, added ~I, Directory
+;   v009 2016-10-11 - Internal support for hex, new SD interface
+;   v008 2016-09-28 - Terminal fixed, new file io command strings
+;   v007 2016-07-14 - Menu rearrange, better Hexdump
+;   v006 2016-07-07 - SD load and boot working again
+;   v005 2016-06-16 - New menus?
+;   v004 2016-06-11 - Hex dump of memory, in, out, poke
+;   v003            - more options
+;   v002 2016-05-10 - usability cleanups
+;   v001 2016-05-09 - initial version, functional
 
 str_splash:
 	.ascii	"Lloader2 Shell for RC2014/LL MicroLlama\r\n"
