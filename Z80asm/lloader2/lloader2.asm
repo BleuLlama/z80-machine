@@ -104,6 +104,7 @@ LASTADDR = LBUFEND + 1
 	CH_TAB   = 0x09
 
 	CH_BS    = 0x08
+	CH_COLON = 0x3a
 	CH_DEL   = 0x7F
 
 	CH_CTRLU = 0x15
@@ -187,6 +188,10 @@ ProcessLine:
 	ld	a, (hl)
 	cp	#CH_NULL
 	ret	z
+
+	; check for Intel Hex input/paste
+	cp	a, #CH_COLON
+	jp 	z, ProcessHex
 
 	; okay. first, let's kick off the strtok style processing
 	call 	U_NullSpace	; replaces first space with a null
@@ -289,6 +294,7 @@ CmdTable:
 	.word	CMDEntry, cVer, iVer, fVer		; 'ver'
 .if( Emulation )
 	.word	CMDEntry, cQuit, iQuit, fQuit		; 'quit'
+	.word	CMDEntry, cQuit2, iQuit, fQuit		; 'quit'
 .endif
 
 	.word	CMDHeader, cHApps, 0, 0
@@ -330,8 +336,6 @@ cHROM:	.asciz	"--- ROM Utils ---"
 cHFile:	.asciz	"--- Files ---"
 cHBoot:	.asciz	"--- Boot ---"
 
-
-; arbitrary ram go
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; 'help'
@@ -495,7 +499,184 @@ fVer:
 	ret
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	;;;;;;;;;;;;;;;
+	; Hex parser
+	; attempt to parse the LBUF as a hex string
+	;
+	;	:<byteCount><addr><type><data><csum>
+	;	byteCount =	1 byte		NumBytes( <data> )
+	; 	address = 	2 bytes		destination address
+	;	type =		1 byte
+	;		0x00	data to install
+	;		0x01 	end of file
+	;	data = 		N bytes		where N == byteCount
+	;	csum = 		1 byte		twosCompliment( sum( [<byteCount>..<data>] ) )
+	;
+	;	twosCompliment( x ) = { invertBits( x ) + 1 }
+; eg:
+;
+;	:10010000214601360121470136007EFE09D2190140
+;	:100110002146017E17C20001FF5F16002148011928
+;	:00000001FF
+;
+; field breakdown:
+;	  bc addr ty data                             csum
+;	: 10 0100 00 214601360121470136007EFE09D21901 (40)
+;	: 10 0110 00 2146017E17C20001FF5F160021480119 (28)
+;	: 00 0000 01 (FF)
 
+; for the first version of this, we're gonna ignore checksum, assume bc is correct, and only check "ty"
+
+; field type identifiers
+HEXF_DATA	= 0x00
+HEXF_END	= 0x01
+
+ProcessHex:
+	ld	hl, #LBUF	; restore the arg pointer to HL
+	inc	hl		; go to the second byte (past the ':')
+
+	call	ReadHLInc
+	ld	b, a		; store number of bytes
+
+	call	ReadHLInc
+	ld	e, a		; Addr top
+	call	ReadHLInc
+	ld	d, a		; Addr bottom
+
+	call	ReadHLInc	; type field
+
+	cp	a, #HEXF_DATA	; Data field
+	jr	z, __phData
+
+	cp	a, #HEXF_END	; End field
+	jr	z, __phEnd
+	jp	__phEF		; ERROR: unknown field
+
+__phData:
+	ld	a, #'D
+	call	PutCh
+	call	PrintNL
+
+	;call	printByte
+	;call	PrintNL
+	ret
+
+__phEnd:
+	ld	a, #'E
+	call	PutCh
+	call	PrintNL
+	ret
+	
+	; do nothing.  just ignore the line.
+
+testHex:
+	call	PrintNL
+	call	PrintNL
+
+	ld	hl, #LBUF	; restore the arg pointer to HL
+	inc	hl		; go to the second byte
+	ld	a, #'#
+	call	PutCh
+
+	call	ReadHLHex	; A = htoi( hl ) (
+	inc	hl
+	inc	hl
+	call	printByte
+
+	ld	a, #'#
+	call	PutCh
+
+	call	ReadHLHex	; A = htoi( hl )
+	call	printByte
+
+	ld	a, #'#
+	call	PutCh
+
+	call	PrintNL
+	ret
+
+__phEF:
+	ld	a, #'F
+	jr	__phError
+__phE0:
+	ld	a, #'0
+__phError:
+	ld	hl, #str_err
+	call	Print
+	call	PutCh
+	call	PrintNL
+	ret
+	
+
+str_err:
+	.asciz	"\r\nHex error: "
+
+ReadHLInc:
+	call	ReadHLHex
+	inc	hl
+	inc	hl
+	ret
+
+ReadHLHex:
+	push	hl
+	push	bc
+	; top nibble
+	ld	a, (hl)
+	call	AtoInt
+	sla	a
+	sla	a
+	sla	a
+	sla	a
+	ld	b, a
+
+	; bottom nibble
+	inc	hl
+	ld	a, (hl)
+	call	AtoInt
+
+	; combine
+	add	a, b
+	pop	bc
+	pop	hl
+	ret
+
+
+AtoInt:
+        cp      #'0
+        jr      c, __ai0	; < 0, bail
+	cp	#'9+1
+	jr	c, __ai9	; 0..9!
+	cp	#'A
+	jr	c, __ai0	; ':'..'@', bail
+	cp	#'F+1
+	jr	c, __aiF	; A..F!
+	cp	#'a
+	jr	c, __ai0	; 'G'..'`', bail
+	cp	#'f+1
+	jr	c, __aif	; a..f!
+	; > 'f', bail
+
+__ai0:	; return a 0 (for error)
+	ld	a, #0
+	ret
+
+__ai9:	; 0..9
+	sub	a, #'0
+	ret
+
+__aiF:	; A..F
+	sub	a, #'A
+	add	a, #10
+	ret
+
+__aif:	; a..f
+	sub	a, #'a
+	add	a, #10
+	ret
+
+	
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 	;;;;;;;;;;;;;;;
 	; boot roms
 
@@ -624,9 +805,7 @@ RCFSD0:
 	jr	RCFSD0		; repeat
 
 RCFSDNL:
-	push	hl
 	call	PrintNL
-	pop	hl
 	ret
 
 ; do a raw dump of everything passed in

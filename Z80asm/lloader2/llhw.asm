@@ -11,8 +11,9 @@
 .if( Emulation )
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; 'quit' - quit out of the emulation
-cQuit:  .asciz  "quit"
-iQuit:  .asciz  "Exit the emulator"
+cQuit:	.asciz  "quit"
+cQuit2:	.asciz  "q"
+iQuit:	.asciz  "Exit the emulator"
 fQuit:
         ;;;;;;;;;;;;;;;
         ; quit from the rom (halt)
