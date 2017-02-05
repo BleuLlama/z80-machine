@@ -524,6 +524,14 @@ fVer:
 ;	: 10 0100 00 214601360121470136007EFE09D21901 (40)
 ;	: 10 0110 00 2146017E17C20001FF5F160021480119 (28)
 ;	: 00 0000 01 (FF)
+;
+;
+;	:0C9000003E48CD46003E49CD460018FE1B
+;	:00000001FF
+;
+;	:0C-9000-00-3E 48 CD 46 00 3E 49 CD 46 00 18 FE 1B
+;	:00 0000 01 FF
+
 
 ; for the first version of this, we're gonna ignore checksum, assume bc is correct, and only check "ty"
 
@@ -531,36 +539,109 @@ fVer:
 HEXF_DATA	= 0x00
 HEXF_END	= 0x01
 
+AddToCSUM:
+	push	af
+	push	bc
+	ld	c, a		; c = new item
+	ld	a, (#LBUF)	; a = previou value
+	add	a, c		; a = sum of the two above
+	ld	(#LBUF), a	; store it 
+
+	pop	bc
+	pop	af
+
+	ret
+
 ProcessHex:
-	ld	hl, #LBUF	; restore the arg pointer to HL
+	xor	a		; clear the checksum accumulator
+	ld	(#LBUF), a
+
 	inc	hl		; go to the second byte (past the ':')
 
 	call	ReadHLInc
+	call	AddToCSUM
 	ld	b, a		; store number of bytes
 
 	call	ReadHLInc
-	ld	e, a		; Addr top
-	call	ReadHLInc
+	call	AddToCSUM
 	ld	d, a		; Addr bottom
+	call	ReadHLInc
+	call	AddToCSUM
+	ld	e, a		; Addr top
 
 	call	ReadHLInc	; type field
+	call	AddToCSUM
 
-	cp	a, #HEXF_DATA	; Data field
+	cp	a, #HEXF_DATA	; Handle a Data field
 	jr	z, __phData
 
-	cp	a, #HEXF_END	; End field
+	cp	a, #HEXF_END	; Handle a End field
 	jr	z, __phEnd
+
 	jp	__phEF		; ERROR: unknown field
 
+;;;;;;;;;;;;;; HEX DATA
 __phData:
 	ld	a, #'D
 	call	PutCh
 	call	PrintNL
 
-	;call	printByte
-	;call	PrintNL
+__phD0:
+	ld	a, b
+	cp	#0x00		; special case handling
+	jr	z, __phLEX
+	
+	; b has number of bytes
+	; de is the start location
+	call	ReadHLInc	; read byte into a
+	call	AddToCSUM
+	ld	(de), a
+	inc	de
+	djnz	__phD0
+
+__phLEX:
+	; ok.  Now the #LBUF[0] contains the sum
+	call	ReadHLHex	; now a contains passed in CSUM
+
+	; compute our CSUM
+	ld	c, a		; c = good checksum
+	ld	hl, #LBUF
+	ld	a, (hl)		; a = our sum
+	xor	a, #0xFF	; a = invert(our sum)
+	ld	b, #1
+	add	a, b		; a = our checksum
+
+	cp	a, c
+	jr	z, __phOK	; OK checksum!
+
+__phCSUM:
+	; checksum error
+	call	printByte
+	ld	a, #'=
+	call	PutCh
+	ld	a, c
+	call	printByte
+	ld	hl, #str_ErrCSUM
+	call	Print
 	ret
 
+	; ok!
+__phOK:
+	push	de
+	pop	hl
+	call	printHL
+	ld	hl, #str_OK
+	call	Print
+	ret
+
+str_ErrCSUM:
+	.asciz	": ERROR: Bad checksum.\r\n"
+
+str_OK:
+	.asciz	": OK.\r\n"
+	
+
+;;;;;;;;;;;;;; HEX END
 __phEnd:
 	ld	a, #'E
 	call	PutCh
@@ -568,32 +649,6 @@ __phEnd:
 	ret
 	
 	; do nothing.  just ignore the line.
-
-testHex:
-	call	PrintNL
-	call	PrintNL
-
-	ld	hl, #LBUF	; restore the arg pointer to HL
-	inc	hl		; go to the second byte
-	ld	a, #'#
-	call	PutCh
-
-	call	ReadHLHex	; A = htoi( hl ) (
-	inc	hl
-	inc	hl
-	call	printByte
-
-	ld	a, #'#
-	call	PutCh
-
-	call	ReadHLHex	; A = htoi( hl )
-	call	printByte
-
-	ld	a, #'#
-	call	PutCh
-
-	call	PrintNL
-	ret
 
 __phEF:
 	ld	a, #'F
@@ -1174,6 +1229,7 @@ str_file:
 ; Text strings
 
 ; Version history
+;   v021 2017-02-04 - Implementing immediate HEX mode
 ;   v020 2017-01-31 - Lloder 2 with shell interface
 ;	-
 ;   v011 2016-10-23 - New decoder working for directory, files
@@ -1190,7 +1246,7 @@ str_file:
 
 str_splash:
 	.ascii	"Lloader2 Shell for RC2014/LL MicroLlama\r\n"
-	.ascii	"  v020 2017-Jan-21  Scott Lawrence\r\n"
+	.ascii	"  v021 2017-Feb-04  Scott Lawrence\r\n"
 	.asciz  "\r\n"
 
 str_Working:
@@ -1213,3 +1269,15 @@ str_Done:
 	.module Lloader ; END
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;.org 0x9000
+;testxx:
+;	ld	a, #'H
+;	call	PutCh
+;	ld	a, #'I
+;	call	PutCh
+;	jr	.
+;
+; :0C9000003E48CD46003E49CD460018FE1B
+; : 0C 9000 00 3E48CD46003E49CD460018FE *1B
+
