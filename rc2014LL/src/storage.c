@@ -235,7 +235,7 @@ void MassStorage_Init( void )
 
 /* ********************************************************************** */
 
-#define kSD_Path 	"SD_DISK/"
+#define kSD_Path 	"MASS_DRV/"
 
 
 /* MassStorage_Do_Listing
