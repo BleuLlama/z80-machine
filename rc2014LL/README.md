@@ -67,7 +67,7 @@ implemented, this port will be at port address $03.
 	  (Note: Not in real hardware, only emulation)
   	  write an $F0 to exit the emulation.
 
-## Mass Storage Interface
+# Mass Storage Interface
 
 The basic idea for Mass storage for the LL system is to implement
 the storage system within the terminal emulation either on a host
@@ -83,7 +83,7 @@ storage system, if you will.
 The downside of this of course is that it may be slow.  But I think
 that's an acceptable tradeoff.
 
-## Mass Storage Modes of Operation
+## Modes of Operation
 
 The mass storage layer implements a few different interfaces which
 can easily be used to retrieve and store data.  They will be explained
@@ -125,3 +125,44 @@ storage devices.  For example the path
 
 is the path to a 128 byte file, "125.BIN" that contains the data stored
 for Drive E, Track 2, Sector 94.
+
+## Escape Sequences
+
+This documentation would be incomplete without the full protocol.  So here
+it is.
+
+The sequence starts with 'esc'-'{', or in hex values: 0x1b, 0x7b,
+and ends with a '}' at the end, hex value 0x7d. These characters
+are illegal within the sequence.
+
+The first field is "Command ID".  This specifies what the remote
+operation or contained data is.  The following optional fields
+indicate parameters.  The fields are separted by commas.  For series
+of bytes, they are sent as ascii values for '0'-'9' and 'A'-'F'.
+The series lasts until tne next character not in this range.
+Whitespace in these sequences is ignored.
+
+The display parser should be switched into command mode when it
+gets the sequence 'esc'-'{' and should remain in it until it recieves
+a '}' or it is manually reset. If it receives an 'esc' and another
+character, it should send down the 'esc' then the other character,
+so that its operation is transparent to the next display handlers.
+
+If a command expects a response, its identifier will end with a ?.
+If it is the response for a command, the character after the
+identifier will be a comma, followed by the requested value.
+
+## Commands
+
+- "CAPS" - Capability Query/Response
+-- Used to determine what's available
+-- Example:  ^[{CAPS?}
+-- Returns:  ^[{CAPS,<list of capabilities>}
+-- The capabilities that can be responded are:
+--- S - sector-based IO operations
+--- F - file-based IO operations
+--- T - type-based IO operations
+--- K - kick.txt file content exists (auto run kickstart content)
+-- Example:  ^[{CAPS,SFTK}
+
+

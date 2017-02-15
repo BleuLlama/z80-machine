@@ -142,10 +142,10 @@ void io_init( z80info * z80 )
     readPorts[ 0x00 ] = HandlePortRead00;
 
     /* Serial IO card */
-    writePorts[ kMC6850PortTxData ] = mc6850_out_console_data;
-    writePorts[ kMC6850PortControl ] = mc6850_out_console_control;
-    readPorts[ kMC6850PortRxData ] = mc6850_in_buffered_console_data;
-    readPorts[ kMC6850PortStatus ] = mc6850_in_buffered_console_status;
+    writePorts[ kMC6850PortTxData ] = mc6850_out_to_console_data;
+    writePorts[ kMC6850PortControl ] = mc6850_out_to_console_control;
+    readPorts[ kMC6850PortRxData ] = mc6850_in_from_buffered_console_data;
+    readPorts[ kMC6850PortStatus ] = mc6850_in_from_buffered_console_status;
 
     /* mass storage */
     writePorts[ kMassPortControl ] = MassStorage_Control;

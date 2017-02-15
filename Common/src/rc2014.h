@@ -12,9 +12,17 @@
 #define __RC2014_H__
 
 
-#define RC2014_VERSION	"1.00  2016-07-13"
+#define RC2014_VERSION	"1.02  2017-02-15"
 
 /* Version info
+ 1.02 	2017-02-xx  SDL
+	Reworded console function names
+	Working on backchannel
+
+ 1.01   2016-11-01  SDL
+	Clean build on Linux
+	Lots of other changes.
+
  1.00 	2016-07-13  SDL
 	First version with version info. ;)
  	Circular buffer for console throttling

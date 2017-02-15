@@ -29,18 +29,18 @@
 void mc6850_console_init( z80info * z80 );
 
 /* send out a byte of data */
-void mc6850_out_console_data( byte data );
+void mc6850_out_to_console_data( byte data );
 
 /* set control in the 6850 (baud, etc */
-void mc6850_out_console_control( byte data );
+void mc6850_out_to_console_control( byte data );
 
 /* read in data from the ACIA
  	if nothing available, returns 0xff (not sure if this is accurate)
 */
-byte mc6850_in_console_data( void );
+byte mc6850_in_from_console_data( void );
 
 /* read in the status byte from the ACIA */
-byte mc6850_in_console_status( void );
+byte mc6850_in_from_console_status( void );
 
 
 /* ********************************************************************** */
@@ -66,9 +66,9 @@ void buffered_console_poll( void );
 int buffered_kbhit( void );
 
 /* get the data byte or 0xFF if none */
-byte mc6850_in_buffered_console_data( void );
+byte mc6850_in_from_buffered_console_data( void );
 
 /* get the status */
-byte mc6850_in_buffered_console_status( void );
+byte mc6850_in_from_buffered_console_status( void );
 
 #endif
