@@ -7,7 +7,7 @@
 #include <unistd.h>		/* for usleep */
 #include <sys/time.h>		/* for timeval */
 #include "mc6850_console.h"	/* port bit definitions */
-
+#include "host.h"		/* host cnsole interface */
 
 
 /* ********************************************************************** */
@@ -22,8 +22,7 @@ void mc6850_console_init( z80info * z80 )
 void mc6850_out_to_console_data( byte data )
 {
     /* send out a byte to the console */
-    putchar( (int) data);
-    fflush( stdout );
+    Host_PutChar( data );
 }
 
 /* set control in the 6850 (baud, etc */
@@ -39,14 +38,7 @@ void mc6850_out_to_console_control( byte data )
 */
 byte mc6850_in_from_console_data( void )
 {
-    byte val = 0xff;
-
-    /* get in a byte from the console */
-    if( z_kbhit() ) {
-	    val = getchar();
-    }
-
-    return val;
+    return Host_GetChar( 0xff );
 }
 
 /* read in the status byte from the ACIA */
@@ -54,7 +46,7 @@ byte mc6850_in_from_console_status( void )
 {
     byte val = 0;
 
-    if( z_kbhit() ) {
+    if( Host_KeyHit() ) {
 	    val |= kPRS_RxDataReady; /* key is available to read */
     }
     val |= kPRS_TXDataEmpty;        /* we're always ready for new stuff */
@@ -64,33 +56,6 @@ byte mc6850_in_from_console_status( void )
     return val;
 }
 
-
-
-/* ********************************************************************** */
-
-
-/* utility function to get the number of milliseconds since we started */
-static long long millis( void )
-{
-    struct timeval te; 
-    long long milliseconds;
-
-    static long long startTime = 0;
-
-    /* get current time */
-    gettimeofday(&te, NULL);
-
-    /* adjust the start time */
-    if( startTime == 0 ) {
-	/* calculate milliseconds */
-	startTime = te.tv_sec*1000LL + te.tv_usec/1000;
-    }
-
-    /* calculate milliseconds */
-    milliseconds = te.tv_sec*1000LL + te.tv_usec/1000;
-
-    return milliseconds;
-}
 
 
 /* ********************************************************************** */
@@ -144,7 +109,7 @@ int buffered_kbhit( void )
 {
     if( bs == be ) return 0;
 
-    if( millis() > nextm ) {
+    if( Host_Millis() > nextm ) {
 	return 1;
     }
 
@@ -169,7 +134,7 @@ byte mc6850_in_from_buffered_console_data( void )
     if( buffered_kbhit() ) 
     {
 	if( burst > kBurstCount ) {
-	    nextm = millis() + kThrottleMS;
+	    nextm = Host_Millis() + kThrottleMS;
 	    burst = 0;
 	}
 	burst++;

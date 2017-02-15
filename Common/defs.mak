@@ -25,6 +25,7 @@ SRCS := \
 	$(ORIGSRC)/z80.c \
 	$(ORIGSRC)/disassem.c \
 	$(ORIGSRC)/main.c \
+	$(COMMONSRC)/host.c \
 	$(COMMONSRC)/memregion.c \
 	$(COMMONSRC)/ioports.c \
 	$(COMMONSRC)/mc6850_console.c \

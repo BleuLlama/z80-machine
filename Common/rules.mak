@@ -22,11 +22,12 @@ $(BIN)/$(TARG): dirs $(OBJS)
 
 ######################################################################
 
-$(BUILD)/z80.o:		$(ORIGSRC)/defs.h $(ORIGSRC)/z80.c
-$(BUILD)/disassem.o:	$(ORIGSRC)/defs.h $(ORIGSRC)/disassem.c
-$(BUILD)/main.o:	$(ORIGSRC)/defs.h $(ORIGSRC)/main.c
-$(BUILD)/iomem.o:	$(ORIGSRC)/defs.h $(SRC)/iomem.c
-$(BUILD)/memregion.o:	$(ORIGSRC)/defs.h $(COMMONSRC)/memregion.c
+$(BUILD)/z80.o:			$(ORIGSRC)/defs.h $(ORIGSRC)/z80.c
+$(BUILD)/disassem.o:		$(ORIGSRC)/defs.h $(ORIGSRC)/disassem.c
+$(BUILD)/main.o:		$(ORIGSRC)/defs.h $(ORIGSRC)/main.c
+$(BUILD)/iomem.o:		$(ORIGSRC)/defs.h $(SRC)/iomem.c
+$(BUILD)/host.o:		$(ORIGSRC)/defs.h $(COMMONSRC)/host.c
+$(BUILD)/memregion.o:		$(ORIGSRC)/defs.h $(COMMONSRC)/memregion.c
 $(BUILD)/m6850_console.o:	$(ORIGSRC)/defs.h $(COMMONSRC)/6850_console.c
 
 ######################################################################
