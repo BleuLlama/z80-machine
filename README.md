@@ -85,6 +85,13 @@ RAW\_TERM
 > This flag will disable the core functions' call to muck about 
 > with the termcap and ioctls and all of that fancy stuff.
 
+FILTER\_CONSOLE
+
+> This flag will tell the system that you will want to filter the
+> content going to and from the console.  This can be used to 
+> remove or inject backchannel content, ansi codes, etc.
+> Implement the few functions at the bottom of 'mc6850\_console.h'
+
 ## Support tools
 
 In order to build everything in this project, you will need a few

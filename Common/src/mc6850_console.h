@@ -60,15 +60,31 @@ byte mc6850_in_from_console_status( void );
 */
 
 /* poll routine to be called from the system_poll() */
-void buffered_console_poll( void );
+void FromConsoleBuffered_PollConsole( void );
 
 /* is a byte available in the buffer? */
-int buffered_kbhit( void );
+int FromConsoleBuffer_KBhit( void );
 
 /* get the data byte or 0xFF if none */
 byte mc6850_in_from_buffered_console_data( void );
 
 /* get the status */
 byte mc6850_in_from_buffered_console_status( void );
+
+
+
+/* ********************************************************************** */
+/* to be implemented for Filters */ 
+
+void Filter_Init( z80info * z80 );
+
+/* Handlers for content going TO the console */
+void Filter_ToConsole( byte data );
+int Filter_ToConsoleAvailable();
+byte Filter_ToConsoleGet();
+
+/* Add stuff into the Console send buffer (typer buffer) */
+void FromConsoleBuffer_QueueChar( char ch );
+void FromConsoleBuffer_QueueStr( char *str );
 
 #endif

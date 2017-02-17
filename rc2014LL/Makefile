@@ -6,7 +6,7 @@ TARG := rc2014ll
 include ../Common/defs.mak
 
 # additional defs
-CFLAGS += -DAUTORUN
+CFLAGS += -DAUTORUN -DFILTER_CONSOLE
 
 SRCS += $(SRC)/storge.c
 OBJS += $(BUILD)/storage.o

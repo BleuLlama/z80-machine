@@ -46,14 +46,14 @@ void system_init( z80info * z80 )
 void system_poll( z80info * z80 )
 {
     /* poll the buffered console handler */
-    buffered_console_poll();
+    FromConsoleBuffered_PollConsole();
 
     /* trigger an interrupt when we get a keyhit */
 
     /* NMI -> call 0x0066 */
     /* INTR -> call 0x0038 (IM1) */
 
-    if( buffered_kbhit() ) 
+    if( FromConsoleBuffer_KBhit() ) 
     {
 	INTR = 1; /* for IM 1 support only */
 	EVENT = TRUE;
