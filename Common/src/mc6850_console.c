@@ -4,12 +4,11 @@
  *
  *  Note: The terminology in this can get confusing, so i'm going to 
  *        define this right now:
- *              HOST                 CONSOLE --> OS specific display
+ *					running on "HOST"
+ *              REMOTE                 CONSOLE --> OS specific display
  *                    ---- TO ----->
  *                    <---- FROM ----
  *
- *        The Z80 generates stuff, which goes TO the CONSOLE
- *        The user types something it goes FROM the CONSOLE
  */
 
 #include <stdio.h>
@@ -17,68 +16,7 @@
 #include <stdlib.h>		/* for exit */
 #include <sys/time.h>		/* for timeval */
 #include "mc6850_console.h"	/* port bit definitions */
-#include "host.h"		/* host cnsole interface */
-
-#ifdef FILTER_CONSOLE
-void Filter_Init( z80info * z80 );
-
-/* Handlers for content going TO the console */
-void Filter_ToConsole( byte data );
-int Filter_ToConsoleAvailable();
-byte Filter_ToConsoleGet();
-
-/* Add stuff into the Console send buffer (typer buffer) */
-void FromConsoleBuffer_QueueChar( char ch );
-void FromConsoleBuffer_QueueStr( char *str );
-
-#endif
-
-//// JUNK TEST
-
-void Filter_Init( z80info * z80 )
-{
-    printf( "Filter init\n" );
-}
-
-static int x = -1;
-char buf[32]; /* additional stuff we're sending to the console */
-
-
-
-/* process input coming from the emulation */
-void Filter_ToConsole( byte data )
-{
-    if( data == 'q' ) {
-	sprintf( buf, "RX a q" );
-	x = 0;
-    } else {
-    	buf[0] = data;
-	buf[1] = '\0';
-    }
-    x = 0;
-}
-
-int Filter_ToConsoleAvailable()
-{
-    if( x == -1 ) return 0;
-    return 1;
-}
-
-byte Filter_ToConsoleGet()
-{
-    byte r;
-
-    if( x == -1 ) return 0xff;
-
-    r = buf[x];
-    x++;
-    if( buf[x] == '\0' ) { x = -1; }
-    
-    return r;
-}
-
-
-//// END JUNK TEST
+#include "host.h"		/* host console interface */
 
 
 /* ********************************************************************** */
@@ -97,7 +35,10 @@ void mc6850_console_init( z80info * z80 )
 void mc6850_out_to_console_data( byte data )
 {
 #ifdef FILTER_CONSOLE
+    /* send it into the filter */
     Filter_ToConsole( data );
+
+    /* and poll the filter for bytes to display to the host console */
     while( Filter_ToConsoleAvailable() )
     {
 	Host_PutChar( Filter_ToConsoleGet() );
@@ -112,6 +53,7 @@ void mc6850_out_to_console_data( byte data )
 void mc6850_out_to_console_control( byte data )
 {
     /* do nothing -- ignored */
+    /* this would be for setting baud, etc. */
 }
 
 
@@ -160,9 +102,12 @@ byte mc6850_in_from_console_status( void )
 
 
 /* ********************************************************************** */
+/* pseudo-circular buffer */
 
-/* pseudo-circular buffer, start and end indeces */
+
 static char intbuffer[ kRingBufSz ];
+
+/* start and end indeces */
 static int bs = 0;
 static int be = 0;
 
@@ -210,14 +155,17 @@ static byte FromConsoleBuffer_Dequeue( void )
     return ret;
 }
 
+/* ********************************************************************** */
+/* Our Available also checks time to throttle the input to the emulation */
 
 /* the next timestamp to read a byte */
 long long nextm = 0;
 int burst = 0;
 
 /* the kbhit() that references our buffer. */
-int FromConsoleBuffer_KBhit( void )
+int FromConsoleBuffer_Available( void )
 {
+
     if( bs == be ) return 0;
 
     if( Host_Millis() > nextm ) {
@@ -227,13 +175,31 @@ int FromConsoleBuffer_KBhit( void )
     return 0;
 }
 
+/* ********************************************************************** */
+
 /* this gets polled from the main loop to update our buffer */
 void FromConsoleBuffered_PollConsole( void )
 {
+
+#ifdef FILTER_CONSOLE
     /* just queue up all available characters... */
-    while ( z_kbhit() ) {
-	FromConsoleBuffer_QueueChar( getchar() );
+    while ( Host_KeyHit() ) {
+       Filter_ToRemote( Host_GetChar( 0x00 ) );
     }
+
+    /* and poll the filter for bytes to send to the remote */
+    while( Filter_ToRemoteAvailable() )
+    {
+        FromConsoleBuffer_QueueChar( Filter_ToRemoteGet() );
+    }
+
+
+#else
+    /* just queue up all available characters... */
+    while ( Host_KeyHit() ) {
+	FromConsoleBuffer_QueueChar( Host_GetChar( 0x00 ) );
+    }
+#endif
 }
 
 
@@ -241,7 +207,7 @@ void FromConsoleBuffered_PollConsole( void )
    if it's not time, return 0xff */
 byte mc6850_in_from_buffered_console_data( void )
 {
-    if( FromConsoleBuffer_KBhit() ) 
+    if( FromConsoleBuffer_Available() ) 
     {
 	if( burst > kBurstCount ) {
 	    nextm = Host_Millis() + kThrottleMS;
@@ -260,7 +226,7 @@ byte mc6850_in_from_buffered_console_status( void )
 {
     byte val = 0;
 
-    if( FromConsoleBuffer_KBhit() ) {
+    if( FromConsoleBuffer_Available() ) {
             val |= kPRS_RxDataReady; /* key is available to read */
     }
     val |= kPRS_TXDataEmpty;        /* we're always ready for new stuff */

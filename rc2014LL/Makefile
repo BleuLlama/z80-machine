@@ -8,8 +8,10 @@ include ../Common/defs.mak
 # additional defs
 CFLAGS += -DAUTORUN -DFILTER_CONSOLE
 
-SRCS += $(SRC)/storge.c
-OBJS += $(BUILD)/storage.o
+SRCS += $(SRC)/storge.c \
+	$(SRC)/filter.c
+OBJS += $(BUILD)/storage.o \
+	$(BUILD)/filter.o
 
 include ../Common/rules.mak
 
@@ -17,6 +19,7 @@ include ../Common/rules.mak
 $(BUILD)/m6850_xxx.o:	$(ORIGSRC)/defs.h $(COMMONSRC)/6850_xxx.c
 
 $(BUILD)/storage.o:	$(ORIGSRC)/defs.h $(SRC)/storage.c
+$(BUILD)/filter.o:	$(ORIGSRC)/defs.h $(SRC)/filter.c
 
 # additional content for 'all' target...
 all:

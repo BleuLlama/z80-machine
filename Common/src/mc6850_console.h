@@ -51,7 +51,7 @@ byte mc6850_in_from_console_status( void );
 /* number of keypresses to send out every duration timeout */
 #define kBurstCount	(5)
 /* size of the buffer */
-#define kRingBufSz 	(1024 * 8)
+#define kRingBufSz 	(1024 * 64) /* There's a lot of space in this mall! */
 
 /* as described in the above defines, the following use a 
     pseudo-ring buffer of kRingBufSz bytes.  It will send out 
@@ -63,7 +63,9 @@ byte mc6850_in_from_console_status( void );
 void FromConsoleBuffered_PollConsole( void );
 
 /* is a byte available in the buffer? */
-int FromConsoleBuffer_KBhit( void );
+int FromConsoleBuffer_Available( void );
+
+
 
 /* get the data byte or 0xFF if none */
 byte mc6850_in_from_buffered_console_data( void );
@@ -72,19 +74,23 @@ byte mc6850_in_from_buffered_console_data( void );
 byte mc6850_in_from_buffered_console_status( void );
 
 
-
 /* ********************************************************************** */
 /* to be implemented for Filters */ 
 
 void Filter_Init( z80info * z80 );
 
-/* Handlers for content going TO the console */
+/* Handlers for content going TO the CONSOLE */
 void Filter_ToConsole( byte data );
-int Filter_ToConsoleAvailable();
+int  Filter_ToConsoleAvailable();
 byte Filter_ToConsoleGet();
 
 /* Add stuff into the Console send buffer (typer buffer) */
 void FromConsoleBuffer_QueueChar( char ch );
-void FromConsoleBuffer_QueueStr( char *str );
+void FromConsoleBuffer_QueueString( char * str );
+
+/* Handlers for content going TO the REMOTE */
+void Filter_ToRemote( byte data );
+int  Filter_ToRemoteAvailable();
+byte Filter_ToRemoteGet();
 
 #endif

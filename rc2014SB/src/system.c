@@ -55,7 +55,7 @@ void system_poll( z80info * z80 )
     /* NMI -> call 0x0066 */
     /* INTR -> call 0x0038 (IM1) */
 
-    if( FromConsoleBuffer_KBhit() )
+    if( FromConsoleBuffer_Available() )
     {
 	INTR = 1; /* for IM 1 support only */
 	EVENT = TRUE;

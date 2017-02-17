@@ -24,8 +24,8 @@ MemRegion mems[] =
     /* 0x1000 = 4kbytes */
     { 0x0000, (32 * 1024), REGION_RO, REGION_ACTIVE, NULL, 
 		//"ROMs/selftest.rom" },
-		"ROMs/lloader2.rom" },
-		//"ROMs/basic32.rom" },
+		//"ROMs/lloader2.rom" },
+		"ROMs/basic32.rom" },
     { 0x0000, (32 * 1024), REGION_RW, REGION_ACTIVE, NULL, NULL },
     { 0x8000, (32 * 1024), REGION_RW, REGION_ACTIVE, NULL, NULL },
 
@@ -83,7 +83,7 @@ void system_poll( z80info * z80 )
 
     FromConsoleBuffered_PollConsole();
 
-    if( FromConsoleBuffer_KBhit() ) 
+    if( FromConsoleBuffer_Available() ) 
     {
 	INTR = 1; /* for IM 1 support only */
 	EVENT = TRUE;
