@@ -48,6 +48,8 @@ int romen_update( const byte val )
     } else {
 	mems[0].active = REGION_ACTIVE;
     }
+
+    lastByte = val;
     return 1;
 }
 
@@ -70,7 +72,6 @@ void system_init( z80info * z80 )
     mems[0].active = REGION_ACTIVE;
     mems[1].active = REGION_ACTIVE;
     mems[2].active = REGION_ACTIVE;
-
 }
 
 /* this gets called before each opcode is run. */
