@@ -193,7 +193,6 @@ void FromConsoleBuffered_PollConsole( void )
         FromConsoleBuffer_QueueChar( Filter_ToRemoteGet() );
     }
 
-
 #else
     /* just queue up all available characters... */
     while ( Host_KeyHit() ) {

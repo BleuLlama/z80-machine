@@ -1,0 +1,13 @@
+
+10 REM FIB.BAS
+20 REM  just print out a sequence of fibbonnaacciii numbers
+100 CURR = 1
+110 LAST = 1
+120 PRINT LAST
+130 PRINT CURR
+140 LAST = CURR
+150 TEMP = CURR + LAST
+160 LAST = CURR
+170 CURR = TEMP
+180 IF CURR < 600000 GOTO 130
+190 PRINT "Done"
