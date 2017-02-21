@@ -67,6 +67,8 @@ implemented, this port will be at port address $03.
 	  (Note: Not in real hardware, only emulation)
   	  write an $F0 to exit the emulation.
 
+
+
 # Mass Storage Interface
 
 The basic idea for Mass storage for the LL system is to implement
@@ -151,6 +153,19 @@ so that its operation is transparent to the next display handlers.
 If a command expects a response, its identifier will end with a ?.
 If it is the response for a command, the character after the
 identifier will be a comma, followed by the requested value.
+
+# Autostart Interface
+
+In order to simplify things, the filtering system will detect a
+phrase in the data stream, and if it sees it, it will send down 
+a boot command back to the terminal.  This will aid in relatively
+hands-off autobooting sequences.  The way to trigger this is by
+entering '0' for "Memory Top?" in NASCOM BASIC.  This text
+sequence is not otherwise printed out, and entering '0' will
+not cause an error with BASIC, so it is a reasonable mechanism
+to piggyback on.
+
+By default, this will trigger an autotyping of "boot.bas"
 
 ## Commands
 

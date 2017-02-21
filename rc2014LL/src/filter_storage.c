@@ -135,6 +135,13 @@ void Handle_go( byte * filename )
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+void Handle_boot( byte * filename )
+{
+    /* handle the case where the user types 0 for autoboot */
+    Handle_type( "boot.bas" );
+}
+
+////////////////////////////////////////////////////////////////////////////////
 
 typedef void (*handleFcn)( byte * );
 
@@ -146,12 +153,15 @@ struct HandlerFuns {
 
 /* handlers for all of the functions called by the remote */
 struct HandlerFuns tcFuncs[] = {
+    { "type", Handle_type },
+    { "boot", Handle_boot },
     { NULL, NULL }
 };
 
 /* handlers for all of the functions called by the console */
 struct HandlerFuns trFuncs[] = {
     { "go", Handle_go },
+    { "boot", Handle_boot },
     { "type", Handle_type },
     { "more", Handle_more },
     { NULL, NULL }

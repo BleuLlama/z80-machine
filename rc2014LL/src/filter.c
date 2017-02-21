@@ -6,8 +6,16 @@
  */
 
 #include <stdio.h>
+#include <string.h>		/* for strlen() */
 #include "mc6850_console.h"
 #include "filter.h"
+
+////////////////////////////////////////
+// Autoboot stuff
+
+#define kAutoBootPhrase		"Memory top? 0"
+#define kAutoBootCommand	"boot"
+
 
 ////////////////////////////////////////
 
@@ -89,6 +97,41 @@ byte Filter_ToConsoleGet()
     return r;
 }
 
+
+//////////////////////////////////////////////////////////////////////
+// autostart support
+
+#define kASBLen	(16)
+char autostartBuf[ kASBLen ];
+int asBpos = 0;
+
+
+void Filter_AutostartCheck( byte data )
+{
+    autostartBuf[ asBpos ] = '\0';
+
+    /* check for end of line */
+    if( data == '\n' || data == '\r' ) {
+	if( !strcmp( autostartBuf, kAutoBootPhrase )) {
+		Filter_ToConsolePutString( "\n>> Autostart phrase detected <<\n" );
+    		Filter_ProcessTC( kAutoBootCommand, strlen( kAutoBootCommand ) );
+	}
+
+	asBpos = 0;
+	autostartBuf[ 0 ] = '\0';
+    } else {
+	/* Nope. append if we're okay to do so */
+	if( asBpos < (kASBLen-2) ) {
+	    autostartBuf[ asBpos ] = data;
+	    asBpos++;
+	    autostartBuf[ asBpos ] = data;
+	}
+    }
+
+}
+
+//////////////////////////////////////////////////////////////////////
+
 ////////////////////////////////////////
 
 /* for REMOTE -> CONSOLE (TC) */
@@ -104,9 +147,12 @@ void Filter_ReInitTC( void )
     FC_TCPos = 0;
 }
 
+
 /* filter input going TO the CONSOLE */
 void Filter_ToConsole( byte data )
 {
+    Filter_AutostartCheck( data );
+    
     switch( ProcessStageTC ) {
 
 	case( kPS_IDLE ):
@@ -217,7 +263,7 @@ void Filter_ReInitTR( void )
     FC_TRPos = 0;
 }
 
-/* filter input going TO the CONSOLE */
+/* filter input going TO the REMOTE */
 void Filter_ToRemote( byte data )
 {
     switch( ProcessStageTR ) {
