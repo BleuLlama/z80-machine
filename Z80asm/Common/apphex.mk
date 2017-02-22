@@ -5,7 +5,7 @@ TARGROM := $(TARGBASE).rom
 SOURCEHEX := $(HEXBASE).hex
 
 GENFILES := $(TARGROM) 
-ROMSDIR := ../../ROMs
+ROMSDIR := ../../prg/ROMs
 
 ################################################################################
 # build rules

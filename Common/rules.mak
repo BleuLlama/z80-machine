@@ -9,7 +9,7 @@ dirs:
 	@echo Creating directories...
 	@-mkdir $(BUILD) 2>/dev/null || true
 	@-mkdir $(BIN) 2>/dev/null || true
-	@-ln -s ../ROMs 2>/dev/null || true
+	@-ln -s ../prg/ROMs 2>/dev/null || true
 
 ######################################################################
 

@@ -6,7 +6,7 @@ ROMSDIR := ../ROMs
 all:	roms
 
 ROMDIRS := \
-	lloader2 \
+	baslload \
 	selftest \
 	basic.32 \
 	basic.56 

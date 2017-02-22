@@ -3,12 +3,15 @@
 
 TARGROM := $(TARGBASE).rom
 TARGLST := $(TARGBASE).lst
+TARGBAS := $(TARGBASE).bas
 
-ROMSDIR := ../../ROMs
+ROMSDIR := ../../prg/ROMs
+BASDIR  := ../../prg/BASIC
 ROMDEF  := ../Common/basicusr.roms
 
 GENFILES := \
 		$(TARGROM) \
+		$(TARGBASE).bas \
 		$(TARGBASE).lst \
 		$(TARGBASE).ihx $(TARGBASE).hex \
 		$(TARGBASE).rel $(TARGBASE).map 
@@ -18,12 +21,18 @@ GENFILES := \
 
 all: $(TARGROM)
 	@echo "+ generate BASIC program from $(TARGLST)"
-	@../Common/basicusr.pl $(TARGLST)
+	@../Common/basicusr.pl $(TARGLST) $(TARGBAS)
+	@echo "+ copy $(TARGBAS) to BASIC directory"
+	@cp $(TARGBAS) $(BASDIR)
 
 $(TARGROM): $(TARGBASE).ihx
 	@echo "+ genroms $<"
 	@genroms $(ROMDEF) $<
 	@mv basicusr.rom $@
+
+$(BASDIR):
+	@echo "+ Creating basic directory"
+	@-mkdir $(BASDIR)
 
 $(ROMSDIR):
 	@echo "+ Creating roms directory"

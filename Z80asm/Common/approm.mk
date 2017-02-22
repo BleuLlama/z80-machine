@@ -3,7 +3,9 @@
 
 TARGROM := $(TARGBASE).rom
 
-ROMSDIR := ../../ROMs
+ROMSDIR := ../../prg/ROMs
+BASDIR  := ../../prg/BASIC
+
 ROMDEF  := ../Common/rc2014.roms
 
 GENFILES := \
