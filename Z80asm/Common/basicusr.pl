@@ -22,10 +22,10 @@ $lines = 0;
 
 foreach $line (@lines)
 {
-    #print $line;
+    print $line;
     chomp $line;
 
-    $care = substr( $line, 8, 21 );
+    $care = substr( $line, 8, 18 );
 
     if(index( $care, "Assembler") != -1 ) { $work = 0; }
 
@@ -34,7 +34,7 @@ foreach $line (@lines)
 	$care =~ s/\s+$//g;
 	next if $care eq "";
 
-    	#printf ">> |%s|\n", $care;
+    	printf ">> |%s|\n", $care;
 	push @program, split( ' ', $care );
 	$lines++;
     }
