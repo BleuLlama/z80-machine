@@ -3,4 +3,4 @@
 
 TARGBASE := selftest
 
-include ../Common/approm.mk
+include ../Common/approm.mak

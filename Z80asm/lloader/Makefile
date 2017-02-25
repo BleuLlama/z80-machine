@@ -9,4 +9,4 @@ DEPNENDS := \
 	    memprobe.asm \
 	    print.asm
 
-include ../Common/approm.mk
+include ../Common/approm.mak

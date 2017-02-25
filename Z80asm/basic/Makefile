@@ -3,7 +3,7 @@
 
 TARGBASE := basic
 
-include ../Common/approm.mk
+include ../Common/approm.mak
 
 
 GENFILES += *.rel

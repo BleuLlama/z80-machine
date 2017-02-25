@@ -3,4 +3,4 @@
 
 TARGBASE := usrtest
 
-include ../Common/basicusr.mk
+include ../Common/basicusr.mak

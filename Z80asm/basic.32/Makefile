@@ -4,4 +4,4 @@
 TARGBASE := basic32
 HEXBASE  := rom_32k
 
-include ../Common/apphex.mk
+include ../Common/apphex.mak

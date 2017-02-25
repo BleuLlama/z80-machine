@@ -3,4 +3,4 @@
 
 TARGBASE := smalltest
 
-include ../Common/approm.mk
+include ../Common/approm.mak

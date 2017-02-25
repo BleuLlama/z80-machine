@@ -7,4 +7,4 @@ TARGBASE := baslload
 # MAKE SURE this matches the .org!
 TOPRAM  := C0
 
-include ../Common/basicusr.mk
+include ../Common/basicusr.mak
