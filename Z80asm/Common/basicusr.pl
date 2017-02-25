@@ -4,6 +4,10 @@
 
 $filename = shift;
 $destfn = shift;
+$baseramtop = shift;
+
+$baseram = $baseramtop . "00";
+
 
 printf ">>  Reading in %s\n", $filename;
 
@@ -36,15 +40,17 @@ foreach $line (@lines)
     }
 }
 
+
 printf ">>  %d items processed.\n", scalar @program;
 printf ">>  Found %d lines of code.\n", $lines;
-printf ">>  Generating %s...\n", $destfn;
+printf ">>  Generating %s for 0x%s\n", $destfn, $baseram;
+
 
 open OF, ">$destfn";
 
 print OF <<EOP;
-10 REM == poke at 0xF800 ==
-20 let mb=&HF800
+10 REM == poke at 0x$baseram ==
+20 let mb=&H$baseram
 
 100 REM == poke it in ==
 110 read op
@@ -57,7 +63,7 @@ print OF <<EOP;
 210 mb = &H8048
 220 poke mb, &HC3
 230 poke mb+1, &H00
-240 poke mb+2, &Hf8
+240 poke mb+2, &H$baseramtop
 
 250 REM == run it ==
 260 print usr(0)

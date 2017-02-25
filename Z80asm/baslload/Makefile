@@ -3,4 +3,8 @@
 
 TARGBASE := baslload
 
+# set our ram load location to C000
+# MAKE SURE this matches the .org!
+TOPRAM  := C0
+
 include ../Common/basicusr.mk

@@ -1,4 +1,4 @@
-; Hex
+; Hex **unused**
 ;          Intel hex file parser
 ;
 ;          2016-07-15 Scott Lawrence

@@ -1,4 +1,7 @@
 ; Lloader for BASIc integration
+;
+;  A simple HEX file loader, and file lister (through console backchannel file access)
+;
 
 .include "../Common/hardware.asm"
 
@@ -44,6 +47,17 @@ PrintLn:
 	ld	hl, #str_CRLF
 	call	Print
 	ret
+
+DisableROM:
+        ld      a, #01
+        out     (RomDisable), a
+        ret
+
+EnableROM:
+        xor     a
+        out     (RomDisable), a
+        ret
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; strings

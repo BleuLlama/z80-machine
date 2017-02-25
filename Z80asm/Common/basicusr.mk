@@ -9,6 +9,8 @@ ROMSDIR := ../../prg/ROMs
 BASDIR  := ../../prg/BASIC
 ROMDEF  := ../Common/basicusr.roms
 
+TOPRAM ?= F8
+
 GENFILES := \
 		$(TARGROM) \
 		$(TARGBASE).bas \
@@ -21,7 +23,7 @@ GENFILES := \
 
 all: $(TARGROM)
 	@echo "+ generate BASIC program from $(TARGLST)"
-	@../Common/basicusr.pl $(TARGLST) $(TARGBAS)
+	@../Common/basicusr.pl $(TARGLST) $(TARGBAS) $(TOPRAM)
 	@echo "+ copy $(TARGBAS) to BASIC directory"
 	@cp $(TARGBAS) $(BASDIR)
 
