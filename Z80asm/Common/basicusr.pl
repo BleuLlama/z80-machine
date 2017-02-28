@@ -5,6 +5,8 @@
 $filename = shift;
 $destfn = shift;
 $baseramtop = shift;
+$autorun = shift;
+
 
 $baseram = $baseramtop . "00";
 
@@ -22,7 +24,7 @@ $lines = 0;
 
 foreach $line (@lines)
 {
-    print $line;
+    #print $line;
     chomp $line;
 
     $care = substr( $line, 8, 18 );
@@ -34,7 +36,7 @@ foreach $line (@lines)
 	$care =~ s/\s+$//g;
 	next if $care eq "";
 
-    	printf ">> |%s|\n", $care;
+    	#printf ">> |%s|\n", $care;
 	push @program, split( ' ', $care );
 	$lines++;
     }
@@ -49,15 +51,18 @@ printf ">>  Generating %s for 0x%s\n", $destfn, $baseram;
 open OF, ">$destfn";
 
 print OF <<EOP;
-10 REM == poke at 0x$baseram ==
-20 let mb=&H$baseram
+10 print "LL-Kickstart-USR() v1.0"
 
-100 REM == poke it in ==
+20 REM == poke at 0x$baseram ==
+30 let mb=&H$baseram
+
+100 print "Poking in the program...";
 110 read op
-120 if op = 999 then goto 200
+120 if op = 999 then goto 160
 130 poke mb, op
 140 let mb = mb + 1
 150 goto 110
+160 print "...Done!"
 
 200 REM == JP start address (c3 00 f8) jp f800 ==
 210 mb = &H8048
@@ -65,7 +70,7 @@ print OF <<EOP;
 230 poke mb+1, &H00
 240 poke mb+2, &H$baseramtop
 
-250 REM == run it ==
+250 print "Calling usr()..."
 260 print usr(0)
 270 end
 
@@ -73,16 +78,16 @@ EOP
 
 
 printf OF "9000 REM == program == \n";
-printf OF "9010 DATA ";
+printf OF "9001 DATA ";
 
-$line = 9010;
+$line = 9001;
 
 $l = 0;
 
 foreach $byte (@program)
 {
     if( $l == 0 ) {
-	$line += 10;
+	$line += 1;
     }
     $l++;
     printf OF hex $byte;
@@ -90,7 +95,7 @@ foreach $byte (@program)
     if( $l < 10 ) { 
 	printf OF ", ";
     } else {
-	$line += 10;
+	$line += 1;
 	printf OF "\n%d DATA ", $line;
 	$l = 0;
     }
@@ -99,9 +104,8 @@ foreach $byte (@program)
 if( $l == 5 ) {
 }
 printf OF "999\n";
-
-
-printf OF "run\n"; 
+$lt = localtime;
+printf OF "%d REM - Created %s\n", $line, $lt;
 
 close OF;
 

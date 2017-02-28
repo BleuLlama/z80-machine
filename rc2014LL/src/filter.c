@@ -152,6 +152,11 @@ void Filter_ReInitTC( void )
 void Filter_ToConsole( byte data )
 {
     Filter_AutostartCheck( data );
+
+    if( consumeFcn ) {
+    	int r = consumeFcn( data );
+	if( r == -1 ) return;
+    }
     
     switch( ProcessStageTC ) {
 
@@ -164,7 +169,12 @@ void Filter_ToConsole( byte data )
 	    break;
 
 	case( kPS_ESC ):
-            if( data == kStartMsgRC ) {
+	    if( data == '\r' || data == '\n' ) {
+		/* bail out */
+                ProcessStageTC = kPS_IDLE;
+		Filter_ReInitTC();
+
+	    } else if( data == kStartMsgRC ) {
 		/* yep! it's for us! */
                 ProcessStageTC = kPS_TCCMD;	/* Remote->Console command! */
             } else {
@@ -178,11 +188,17 @@ void Filter_ToConsole( byte data )
 
 	case( kPS_TCCMD ):
 	    /* process... */
-            if( data == kEndMsg ) {
+	    if( data == '\r' || data == '\n' ) {
+		/* bail out */
+                ProcessStageTC = kPS_IDLE;
+		Filter_ReInitTC();
+
+	    } else if( data == kEndMsg ) {
 		/* We're done. process it! */
                 ProcessStageTC = kPS_IDLE;
 		Filter_ProcessTC( FilterTCCommand, FC_TCPos );
 		Filter_ReInitTC();
+
 	    } else {
 		if( FC_TCPos < kFCPosMax ) {
 		    FilterTCCommand[ FC_TCPos ] = data;
@@ -277,9 +293,15 @@ void Filter_ToRemote( byte data )
 	    break;
 
 	case( kPS_ESC ):
-            if( data == kStartMsgCR ) {
+	    if( data == '\r' || data == '\n' ) {
+		/* bail out */
+                ProcessStageTR = kPS_IDLE;
+		Filter_ReInitTR();
+
+	    } if( data == kStartMsgCR ) {
 		/* yep! it's for us! */
                 ProcessStageTR = kPS_TRCMD;	/* Console->Remote command! */
+
             } else {
 		/* nope.  inject both bytes so far. */
 		Filter_ToRemotePutByte( kEscKey );
@@ -291,11 +313,17 @@ void Filter_ToRemote( byte data )
 
 	case( kPS_TRCMD ):
 	    /* process... */
-            if( data == kEndMsg ) {
+	    if( data == '\r' || data == '\n' ) {
+		/* Bail out! */
+                ProcessStageTR = kPS_IDLE;
+		Filter_ReInitTR();
+
+	    } else if( data == kEndMsg ) {
 		/* We're done. process it! */
                 ProcessStageTR = kPS_IDLE;
 		Filter_ProcessTR( FilterTRCommand, FC_TRPos );
 		Filter_ReInitTR();
+
 	    } else {
 		if( FC_TRPos < kFCPosMax ) {
 		    FilterTRCommand[ FC_TRPos ] = data;

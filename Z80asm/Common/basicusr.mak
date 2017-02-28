@@ -1,18 +1,15 @@
 #rom makefile to use Scott Lawrence's "Genroms" tool to build 
 # rom files from the intel hex file
 
-TARGROM := $(TARGBASE).rom
 TARGLST := $(TARGBASE).lst
 TARGBAS := $(TARGBASE).bas
 
 ROMSDIR := ../../prg/ROMs
 BASDIR  := ../../prg/BASIC
-ROMDEF  := ../Common/basicusr.roms
 
 TOPRAM ?= F8
 
 GENFILES := \
-		$(TARGROM) \
 		$(TARGBASE).bas \
 		$(TARGBASE).lst \
 		$(TARGBASE).ihx $(TARGBASE).hex \
@@ -21,16 +18,13 @@ GENFILES := \
 ################################################################################
 # build rules
 
-all: $(TARGROM)
-	@echo "+ generate BASIC program from $(TARGLST)"
-	@../Common/basicusr.pl $(TARGLST) $(TARGBAS) $(TOPRAM)
+all: $(TARGBAS)
 	@echo "+ copy $(TARGBAS) to BASIC directory"
 	@cp $(TARGBAS) $(BASDIR)
 
-$(TARGROM): $(TARGBASE).ihx
-	@echo "+ genroms $<"
-	@genroms $(ROMDEF) $<
-	@mv basicusr.rom $@
+$(TARGBAS): $(TARGBASE).ihx
+	@echo "+ generate BASIC program from $(TARGLST)"
+	@../Common/basicusr.pl $(TARGLST) $(TARGBAS) $(TOPRAM) AUTORUN
 
 $(BASDIR):
 	@echo "+ Creating basic directory"

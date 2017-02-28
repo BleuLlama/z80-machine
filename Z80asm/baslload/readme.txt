@@ -70,3 +70,40 @@ well.
 
 Once that happens, that HEX file will get loaded in, turn off the
 ROM and reset the cpu.
+
+--------------------------------------------------------------------------------
+
+Remote side			Console side
+
+Save: 
+
+echo "<>save file.bas<>"
+				echo off
+				echo "<>list<>"^g
+(listing)			save listing until ^g
+				echo on
+
+
+Load:
+echo "<>load file,bas<>"
+new
+				ghost type FILE
+(consume)
+				echo on
+
+
+Chain:		(if called, must be called right before an END)
+	new
+	(load)
+	run
+
+Catalog:
+echo "<>ls<>"
+				opendir
+				readdir
+				print: <D/F> %20s %20d, fname, size
+				END
+				closedir
+				
+
+e

@@ -8,6 +8,9 @@ notes.txt
 *.swp
 .DS_Store
 typescript
+foo.bas
+prg/prg
+
 
 rc2014/ROMs
 rc2014LL/ROMs
