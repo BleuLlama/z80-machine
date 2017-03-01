@@ -1,5 +1,6 @@
-/* Filter
- *
+/* Filter for LlamaBDOS
+ *	LL/Llama Backchannel Disk Operating System
+
  *  2017-02-17 Scott Lawrence
  *
  *   Filter console input to provide a backchannel for data transfer
@@ -12,15 +13,19 @@
 #include "filter.h"
 
 ////////////////////////////////////////////////////////////////////////////////
-// path stuff
-static char cwbuf[1024];
-char fpbuf[1024];
-
-char * cwd = NULL;
+// Define stuff
 
 #define kHomePath ("MASS_DRV/BASIC/")
-
 #define kBootFile ("boot.bas")
+
+#define kBDOSBufSz (1024)
+#define kPRBufSz (255)
+
+// path stuff
+static char cwbuf[kBDOSBufSz];
+char fpbuf[kBDOSBufSz];
+
+char * cwd = NULL;
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -34,7 +39,7 @@ void Handle_init( void )
     if( cwd != NULL ) return;
 
     cwd = &cwbuf[0];
-    strcpy( cwd, kHomePath );
+    strncpy( cwd, kHomePath, kBDOSBufSz );
 }
 
 ////////////////////////////////////////
@@ -86,7 +91,7 @@ void Handle_cd( byte * path )
     if( !path || path[0] == '\0' )
     {
 	cwd = &cwbuf[0];
-	strcpy( cwd, kHomePath );
+	strncpy( cwd, kHomePath, kBDOSBufSz );
 	return;
     }
 
@@ -183,15 +188,15 @@ void Handle_more( byte * filename )
 {
     int c = 0;
     FILE * fp = NULL;
-    char prbuf[ 255 ];
+    char prbuf[ kPRBufSz ];
 
     /* build the path */
-    strcpy( fpbuf, cwbuf );
-    strcat( fpbuf, filename );
+    strncpy( fpbuf, cwbuf, kBDOSBufSz );
+    strncat( fpbuf, filename, kBDOSBufSz );
 
     fp = fopen( fpbuf, "r" );
     if( fp ) {
-	sprintf( prbuf, "------- Begin %s -------\n", fpbuf );
+	snprintf( prbuf, kPRBufSz, "------- Begin %s -------\n", fpbuf );
 	Filter_ToConsolePutString( prbuf );
 
 	while( (c = fgetc(fp)) != EOF ) {
@@ -199,11 +204,11 @@ void Handle_more( byte * filename )
 	}
 	
     	fclose( fp );
-	sprintf( prbuf, "------- End %s -------\n", fpbuf );
+	snprintf( prbuf, kPRBufSz, "------- End %s -------\n", fpbuf );
 	Filter_ToConsolePutString( prbuf );
 
     } else {
-	sprintf( prbuf, "%s: Cannot open!/n", fpbuf );
+	snprintf( prbuf, kPRBufSz, "%s: Cannot open!/n", fpbuf );
 	Filter_ToConsolePutString( prbuf );
     }
 }
@@ -216,15 +221,15 @@ void Handle_type( byte * filename )
     int crlf = 0;
     int c = 0;
     FILE * fp = NULL;
-    char prbuf[ 255 ];
+    char prbuf[ kPRBufSz ];
 
     /* build the path */
-    strcpy( fpbuf, cwbuf );
-    strcat( fpbuf, filename );
+    strncpy( fpbuf, cwbuf, kBDOSBufSz );
+    strncat( fpbuf, filename, kBDOSBufSz );
 
     fp = fopen( fpbuf, "r" );
     if( fp ) {
-	sprintf( prbuf, "%s: Typing to remote...\n", fpbuf );
+	snprintf( prbuf, kPRBufSz, "%s: Typing to remote...\n", fpbuf );
 	Filter_ToConsolePutString( prbuf );
 
 	while( (c = fgetc(fp)) != EOF ) {
@@ -241,7 +246,7 @@ void Handle_type( byte * filename )
     	fclose( fp );
 	Filter_ToConsolePutString( "Done!\n" );
     } else {
-	sprintf( prbuf, "%s: Cannot open!/n", fpbuf );
+	snprintf( prbuf, kPRBufSz, "%s: Cannot open!/n", fpbuf );
 	Filter_ToConsolePutString( prbuf );
     }
 }
@@ -299,7 +304,7 @@ void Handle_chain( byte * filename )
 
 
 /* static/globals for the save routine */
-#define kLBsz (1024)
+#define kLBsz (kBDOSBufSz)
 static char cfLineBuf[kLBsz];
 static size_t cfLinePos = 0;
 static int gotNumbers = 0;
@@ -364,8 +369,8 @@ int consumeSaveByte( byte b )
  */
 void Handle_save( byte * filename )
 {
-    strcpy( fpbuf, cwd );
-    strcat( fpbuf, filename );
+    strncpy( fpbuf, cwd, kBDOSBufSz );
+    strncat( fpbuf, filename, kBDOSBufSz );
 
     /* attempt to open the file for write */
     savefp = fopen( fpbuf, "w" );
@@ -414,8 +419,8 @@ struct HandlerFuns tcFuncs[] = {
     /* file type */
     { "type", Handle_type },
     { "chain", Handle_chain },
+    { "loadrun", Handle_loadrun }, /* must be before "load" */
     { "load", Handle_load },
-    { "loadrun", Handle_loadrun },
     { "save", Handle_save },
 
     /* directory */
@@ -433,8 +438,8 @@ struct HandlerFuns trFuncs[] = {
     /* file type */
     { "type", Handle_type },
     { "chain", Handle_chain },
+    { "loadrun", Handle_loadrun }, /* must be before "load" */
     { "load", Handle_load },
-    { "loadrun", Handle_loadrun },
     { "save", Handle_save },
 
     /* directory */

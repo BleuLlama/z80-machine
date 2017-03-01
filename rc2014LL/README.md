@@ -7,7 +7,7 @@ This is Scott's updated 64k version of the RC2014.  Its features are:
  - 64 kbytes of RAM
  - 8 kbytes of ROM
  - Boot ROM installed that offers the ability to load from SD card
- - SD interface via console escape sequences 
+ - SD interface via console escape sequences (LlamaBDOS)
 
 The emulation here will be updated when actual hardware is fabricated.
 Until then, consider this a prototype of the finalized hardware
@@ -69,7 +69,7 @@ implemented, this port will be at port address $03.
 
 
 
-# Mass Storage Interface
+# LlamaBDOS - Mass Storage Interface
 
 The basic idea for Mass storage for the LL system is to implement
 the storage system within the terminal emulation either on a host
@@ -100,6 +100,14 @@ NASCOM BASIC.  Or it can be used to transfer text files to and from
 the computer without any additional code written.  
 
 It essentially "types" out files, and saves text being displayed.
+
+There is an included file "skeleton.bas" which can be loaded via the 
+autoboot mechanism (copy it as "boot.bas") or can be loaded in using
+this one-line program
+
+    10 PRINT CHR$(27);CHR$(123);"loadrun skeleton.bas";CHR$(7) 
+
+See below for the Skeleton.bas documentation.
 
 ### File Mode
 
@@ -165,19 +173,43 @@ sequence is not otherwise printed out, and entering '0' will
 not cause an error with BASIC, so it is a reasonable mechanism
 to piggyback on.
 
-By default, this will trigger an autotyping of "boot.bas"
+By default, this will trigger an "loadrun" of "boot.bas", which
+will "type" it in, then type "run".
 
-## Commands
+# Skeleton.bas
 
-- "CAPS" - Capability Query/Response
--- Used to determine what's available
--- Example:  ^[{CAPS?}
--- Returns:  ^[{CAPS,<list of capabilities>}
--- The capabilities that can be responded are:
---- S - sector-based IO operations
---- F - file-based IO operations
---- T - type-based IO operations
---- K - kick.txt file content exists (auto run kickstart content)
--- Example:  ^[{CAPS,SFTK}
+This file is provided as an interface for BASIC to add in load,
+save, chain, and disk interface functionality. It will occupy the
+space between and including lines 50 through 99. This gives you 49
+lines for REM style commenting about your program, and then 100-9999
+for your application.
 
+It also uses two variables:
+- f$ - to define the self-program's filename
+- c$ - to define the command to be used. 
+
+To configure it for your program, change the filename you wish to
+use for your program on line 51, and when you load in the program
+just type "run 50" to set up this (and other future) variables.
+
+The following entry points and line regions will always be 
+backwards compatible with the following definitions. These can also
+be adapted for your own use, like for example command 73.
+
+- 50 - One-time setup stuff.  Edit on a new program, and type "run 50" to configure
+- 70 - save the current program
+- 71 - clear and (re)load the current program
+- 72 - clear, reload, and run the current program
+- 73 - type in the specified file (current program)
+- 74 - chain to the specified file
+- 80 - display a catalog file listing of the current directory (direct to console)
+- 81 - reset the directory to BASIC
+- 82 - start a new program based on skeleton.bas
+- 83 - start the "baslload.bas" program, a HEX file loader
+
+And the following internal entry points, which might change:
+
+- 60 - sends a command with a filename argument (internal use)
+- 61 - sends a comamnd with no arguments (internal use)
+- 99 - print ready
 

@@ -19,7 +19,8 @@
 
 80 c$="catalog":gosub 61:goto 99
 81 c$="cd":gosub 61:goto 99
-82 c$="load skeleton.bas":gosub 61:goto 99
+82 c$="loadrun skeleton.bas":gosub 61:goto 99
+83 c$="loadrun baslload.bas":gosub 61:goto 99
 
 99 print "Ready.":end
 
