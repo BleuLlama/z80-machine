@@ -5,10 +5,37 @@
  *   Filter console input to provide a backchannel for data transfer
  */
 
+#include <dirent.h>
 #include <stdio.h>
 #include <string.h>	/* strlen, strcmp */
 #include "mc6850_console.h"
 #include "filter.h"
+
+////////////////////////////////////////////////////////////////////////////////
+// path stuff
+static char cwbuf[1024];
+char fpbuf[1024];
+
+char * cwd = NULL;
+
+#define kHomePath ("MASS_DRV/BASIC/")
+
+#define kBootFile ("boot.bas")
+
+
+////////////////////////////////////////////////////////////////////////////////
+
+/* Handle_init
+ *
+ *  do one-time inits
+ */
+void Handle_init( void )
+{
+    if( cwd != NULL ) return;
+
+    cwd = &cwbuf[0];
+    strcpy( cwd, kHomePath );
+}
 
 ////////////////////////////////////////
 
@@ -40,29 +67,6 @@ char * checkAndAdvance( char * buf, char * key )
     return buf;
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// path stuff
-static char cwbuf[1024];
-char fpbuf[1024];
-
-char * cwd = NULL;
-
-
-
-////////////////////////////////////////////////////////////////////////////////
-
-/* Handle_init
- *
- *  do one-time inits
- */
-void Handle_init( void )
-{
-    if( cwd != NULL ) return;
-
-    cwd = &cwbuf[0];
-    strcpy( cwd, "MASS_DRV/BASIC/" );
-    
-}
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -70,18 +74,19 @@ void Handle_init( void )
 
 
 ////////////////////////////////////////
-// path stuff
+// path and directory stuff
 
 
+/* Handle_cd
+ *	change directory relative, absolute or $HOME
+ */
 void Handle_cd( byte * path )
 {
-    Handle_init();
-
     // no path, reset to "home"
     if( !path || path[0] == '\0' )
     {
 	cwd = &cwbuf[0];
-	strcpy( cwd, "MASS_DRV/BASIC/" );
+	strcpy( cwd, kHomePath );
 	return;
     }
 
@@ -89,6 +94,85 @@ void Handle_cd( byte * path )
     // if it does exist, copy that to 'cwd'
 
     // TODO
+}
+
+
+int quietText( byte b )
+{
+    static byte lastb = 0;
+
+    if( ( lastb == 0x0a || lastb == 0x0d ) && b == '.')
+    {
+    	consumeFcn = NULL;
+    }
+
+    lastb = b;
+	
+    return -1;
+}
+
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
+int DirOrFileSize( const char *path )
+{
+    struct stat statbuf;
+
+    /* attempt to stat */
+    if (stat(path, &statbuf) != 0) {
+    	return -999;
+    }
+
+    /* -1 for directory */
+    if( S_ISDIR(statbuf.st_mode) ) {
+	return -1;
+    }
+
+    return statbuf.st_size;
+}
+
+/* Handle_catalog
+ *	give a listing of the current directory
+ *	end it with "."
+ */
+void Handle_catalog( byte * junk )
+{
+    DIR *d;
+    struct dirent *dir;
+    char buf[80];
+    int fsize = 0;
+
+    d = opendir( cwd );
+    if (d)
+    {
+	Filter_ToConsolePutString( "Listing of " );
+	Filter_ToConsolePutString( cwd );
+	Filter_ToConsolePutString( "\n" );
+        while ((dir = readdir(d)) != NULL)
+        {
+	    /* skip if there's no content, or "." */
+	    if(    !( dir->d_name[0] == '.' && dir->d_name[1] == '\0' )
+		&& !( dir->d_name[0] == '\0' )
+	      )
+	    {
+		snprintf( buf, 80, "%s/%s", cwd, dir->d_name );
+		fsize = DirOrFileSize( buf );
+
+		snprintf( buf, 80, "  %20s   ", dir->d_name );
+		Filter_ToConsolePutString( buf );
+		if( fsize == -1 ) {
+		    Filter_ToConsolePutString( "DIR\n" );
+		} else if( fsize == -999 ) {
+		    Filter_ToConsolePutString( "?err\n" );
+		} else {
+		    snprintf( buf, 80, "%d\n", fsize );
+		    Filter_ToConsolePutString( buf );
+		}
+	    }
+        }
+        closedir(d);
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -100,8 +184,6 @@ void Handle_more( byte * filename )
     int c = 0;
     FILE * fp = NULL;
     char prbuf[ 255 ];
-
-    Handle_init();
 
     /* build the path */
     strcpy( fpbuf, cwbuf );
@@ -135,8 +217,6 @@ void Handle_type( byte * filename )
     int c = 0;
     FILE * fp = NULL;
     char prbuf[ 255 ];
-
-    Handle_init();
 
     /* build the path */
     strcpy( fpbuf, cwbuf );
@@ -174,9 +254,20 @@ void Handle_type( byte * filename )
  */
 void Handle_load( byte * filename )
 {
-    Filter_ToConsolePutString( "new\n" );
-    Filter_ToConsolePutString( "clear\n" );
+    Filter_ToRemotePutString( "new\r\n" );
+    Filter_ToRemotePutString( "clear\r\n" );
     Handle_type( filename );
+}
+
+/* Handle_loadrun
+ *	New, clear and run a new program, then run it
+ */
+void Handle_loadrun( byte * filename )
+{
+    Filter_ToRemotePutString( "new\r\n" );
+    Filter_ToRemotePutString( "clear\r\n" );
+    Handle_type( filename );
+    Filter_ToRemotePutString( "run\r\n" );
 }
 
 /* Handle_chain
@@ -186,7 +277,7 @@ void Handle_load( byte * filename )
 void Handle_chain( byte * filename )
 {
     Handle_type( filename );
-    Filter_ToConsolePutString( "run\n" );
+    Filter_ToRemotePutString( "run\r\n" );
 }
 
 
@@ -273,8 +364,6 @@ int consumeSaveByte( byte b )
  */
 void Handle_save( byte * filename )
 {
-    Handle_init();
-
     strcpy( fpbuf, cwd );
     strcat( fpbuf, filename );
 
@@ -305,7 +394,7 @@ void Handle_save( byte * filename )
 void Handle_boot( byte * filename )
 {
     /* handle the case where the user types 0 for autoboot */
-    Handle_chain( "boot.bas" );
+    Handle_loadrun( kBootFile );
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -326,9 +415,11 @@ struct HandlerFuns tcFuncs[] = {
     { "type", Handle_type },
     { "chain", Handle_chain },
     { "load", Handle_load },
+    { "loadrun", Handle_loadrun },
     { "save", Handle_save },
 
     /* directory */
+    { "catalog", Handle_catalog },
     { "cd", Handle_cd },
 
     { NULL, NULL }
@@ -343,9 +434,11 @@ struct HandlerFuns trFuncs[] = {
     { "type", Handle_type },
     { "chain", Handle_chain },
     { "load", Handle_load },
+    { "loadrun", Handle_loadrun },
     { "save", Handle_save },
 
     /* directory */
+    { "catalog", Handle_catalog },
     { "cd", Handle_cd },
 
     { NULL, NULL }
@@ -374,6 +467,7 @@ void Filter_ProcessTC( byte * buf, size_t len )
     	if( (args = checkAndAdvance( buf, hf->name )) != NULL )
 	{
 	    /* found it! Call the handler! */
+	    Handle_init();
 	    hf->fcn( args );
 	    used = 1;
 	}
