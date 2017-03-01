@@ -1,1 +1,1 @@
-dos.bas
+skeleton.bas
