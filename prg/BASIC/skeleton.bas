@@ -2,7 +2,7 @@
 47 REM ======================================
 
 48 goto 100
-49 REM Skeleton BASIC library v001, yorgle@gmail.com 
+49 REM Skeleton BASIC library v001, yorgle/gmail.com 
 
 50 REM == setuup vars
 51 f$="example.bas"
