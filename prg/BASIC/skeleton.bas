@@ -6,10 +6,10 @@
 
 50 REM == setuup vars
 51 f$="example.bas"
-59 print "Ready.":end
+59 return
 
-60 print CHR$(27);CHR$(123);c$;" ";f$;CHR$(7):return
-61 print CHR$(27);CHR$(123);c$;CHR$(7):return
+60 gosub 50:print CHR$(27);CHR$(123);c$;" ";f$;CHR$(7):return
+61 gosub 50:print CHR$(27);CHR$(123);c$;CHR$(7):return
 
 70 c$="save":gosub 60:goto 99
 71 c$="load":gosub 60:goto 99
