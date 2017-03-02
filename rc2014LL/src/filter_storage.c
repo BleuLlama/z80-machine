@@ -9,6 +9,7 @@
 #include <dirent.h>
 #include <stdio.h>
 #include <string.h>	/* strlen, strcmp */
+#include <time.h>	/* time */
 #include "mc6850_console.h"
 #include "filter.h"
 
@@ -392,6 +393,38 @@ void Handle_save( byte * filename )
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// Date and time
+
+/* handle_seconds
+ *	send back a number and hit return
+ */
+void Handle_seconds( byte * arg )
+{
+    char buf[16];
+    snprintf( buf, 16, "    %lu\r\n", (unsigned long) time( NULL ));
+    Filter_ToRemotePutString( buf );
+    printf( "secs>> %s <<\n", buf );
+}
+
+
+/* handle_date
+ *	send back a parseable date string
+ */
+void Handle_date( byte * arg )
+{
+    time_t current_time = time( NULL );
+    char buf[32];
+
+    struct tm * loctime;
+    loctime = localtime( &current_time );
+    strftime( buf, 32, "    %Y%m%d  %H%M%S\r\n", loctime );
+    Filter_ToRemotePutString( buf );
+    printf( "date>> %s <<\n", buf );
+}
+
+
+
+////////////////////////////////////////////////////////////////////////////////
 /* handle_boot
  *	trigger the command to run when the "boot" command is called
  *	basically, chain "boot.bas" (new, load, run )
@@ -427,6 +460,10 @@ struct HandlerFuns tcFuncs[] = {
     { "catalog", Handle_catalog },
     { "cd", Handle_cd },
 
+    /* datetime */
+    { "seconds", Handle_seconds },
+    { "date", Handle_date },
+
     { NULL, NULL }
 };
 
@@ -445,6 +482,10 @@ struct HandlerFuns trFuncs[] = {
     /* directory */
     { "catalog", Handle_catalog },
     { "cd", Handle_cd },
+
+    /* datetime */
+    { "seconds", Handle_seconds },
+    { "date", Handle_date },
 
     { NULL, NULL }
 };

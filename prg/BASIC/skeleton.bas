@@ -22,6 +22,10 @@
 82 c$="loadrun skeleton.bas":gosub 61:goto 99
 83 c$="loadrun baslload.bas":gosub 61:goto 99
 
+84 C$="seconds":GOSUB 61:GOTO 98
+85 C$="date":GOSUB 61:GOTO 98
+
+98 input A$: print "Result: ";A$
 99 print "Ready.":end
 
 100 REM == Your program here... ==
