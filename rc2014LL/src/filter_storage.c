@@ -401,9 +401,9 @@ void Handle_save( byte * filename )
 void Handle_seconds( byte * arg )
 {
     char buf[16];
-    snprintf( buf, 16, "    %lu\r\n", (unsigned long) time( NULL ));
+    snprintf( buf, 16, "   %lu\r\n", (unsigned long) time( NULL ));
     Filter_ToRemotePutString( buf );
-    printf( "secs>> %s <<\n", buf );
+    //printf( "secs>> %s <<\n", buf );
 }
 
 
@@ -417,9 +417,9 @@ void Handle_date( byte * arg )
 
     struct tm * loctime;
     loctime = localtime( &current_time );
-    strftime( buf, 32, "    %Y%m%d  %H%M%S\r\n", loctime );
+    strftime( buf, 32, "   %Y%m%d  %H%M%S\r\n", loctime );
     Filter_ToRemotePutString( buf );
-    printf( "date>> %s <<\n", buf );
+    //printf( "date>> %s <<\n", buf );
 }
 
 

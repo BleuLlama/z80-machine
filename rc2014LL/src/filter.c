@@ -223,7 +223,11 @@ void Filter_ToConsole( byte data )
 //  add something into the ToRemote buffer
 void Filter_ToRemotePutByte( byte data )
 {
-    trPos++;
+    if( trPos < 0 ) {
+	trPos = 0;
+    } else {
+	trPos++;
+    }
     ToRemoteBuffer[trPos] = data;
     ToRemoteBuffer[trPos+1] = '\0';
 }
@@ -240,7 +244,7 @@ void Filter_ToRemotePutString( char * str )
 //  Is there something in the ToRemote buffer?
 int Filter_ToRemoteAvailable()
 {
-    if( trPos == -1 ) return 0;
+    if( trPos < 0 ) return 0;
     return 1;
 }
 
@@ -251,7 +255,7 @@ byte Filter_ToRemoteGet()
     size_t i;
     byte r;
 
-    if( trPos == -1 ) return 0xff;
+    if( trPos < 0 ) return 0xff;
 
     r = ToRemoteBuffer[0];
 
