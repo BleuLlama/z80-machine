@@ -16,16 +16,23 @@
 ////////////////////////////////////////////////////////////////////////////////
 // Define stuff
 
+// This is the starting path on our filesystem
 #define kHomePath ("MASS_DRV/BASIC/")
+
+// this is the file autoloaded when "Memory Size? 0"
 #define kBootFile ("boot.bas")
 
+// Path buffer sizes
 #define kBDOSBufSz (1024)
 #define kPRBufSz (255)
 
-// path stuff
+// current working directory path
 static char cwbuf[kBDOSBufSz];
+
+// full path buffer for building filename paths
 char fpbuf[kBDOSBufSz];
 
+// pointer to the current working directory buffer. Should be &cwbuf[0]
 char * cwd = NULL;
 
 
