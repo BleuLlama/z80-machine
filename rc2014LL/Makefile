@@ -24,5 +24,6 @@ $(BUILD)/filter_storage.o:	$(ORIGSRC)/defs.h $(SRC)/filter_storage.c
 # additional content for 'all' target...
 all:
 	@echo Creating Mass Storage content...
+	@-rm MASS_DRV 2>/dev/null || true
 	@-ln -s ../prg MASS_DRV 2>/dev/null || true
 
