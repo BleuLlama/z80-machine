@@ -1,12 +1,20 @@
 ; RC2014 related functions
 ; 
+;	theoretically, all of the bare-hardware interface stuff that is
+;	specific to the RC2014 and RC2014LL are in this one file.
+; 
 ;  These use the ACIA at $80 for IO
 ;  Also emulation interface at $EE
+
+	.module RC2014HW
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Output 
 
+; Print
+;	output the c-string pointed to by HL to the console
+;	string must be null terminated (asciz)
 Print:
 	ld	a, (hl)
 	cp	#0x00
@@ -15,22 +23,8 @@ Print:
 	inc	hl
 	jr	Print
 
-PrintLn:
-	call	Print
-	call	PrintNL
-	ret
-
-PrintNL:
-	push	hl
-	ld	hl, #str_CRLF
-	call	Print
-	pop	hl
-	ret
-
-
-str_CRLF:	.asciz	"\r\n"
-		.byte	0x00
-
+; PutCh
+;	put a single character out to the console
 PutCh:
         out     (TermData), a   ; echo
         ret
@@ -38,7 +32,11 @@ PutCh:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Input
 
+; GetCh
+;	loops until a character is ready from the terminal
+;	then reads it in to 'a'
 GetCh:
+	; kbhit check
         in      a, (TermStatus) ; ready to read a byte?
         and     #DataReady      ; see if a byte is available
 
@@ -46,10 +44,8 @@ GetCh:
         in      a, (TermData)   ; get it!
         ret
 
-ToUpper:
-        and     #0xDF           ; make uppercase (mostly)
-        ret
-
+; KbHit
+;	sets zero flag if there is a key ready at the ACIA
 KbHit:
         in      a, (TermStatus)
         and     #DataReady
@@ -59,7 +55,8 @@ KbHit:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Emulation stuff
 
-; if we're un emulation, this will quit out of the emulator
+; ExitEmulation
+;	if we're in emulation, this will quit out of the emulator
 ExitEmulation:
 	ld	a, #EmuExit
 	out	(EmulatorControl), a
@@ -69,13 +66,15 @@ ExitEmulation:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; LL hardware stuff
 
-; turn off the ROM, making $0000-$7FFF RAM Read/Write
+; DisableROM
+;	turn off the ROM, making $0000-$7FFF RAM Read/Write
 DisableROM:
         ld      a, #01
         out     (RomDisable), a
         ret
 
-; turn on the ROM, making $0000-$7FFF RAM Write only
+; EnableROM
+;	turn on the ROM, making $0000-$7FFF RAM Write only
 EnableROM:
         xor     a
         out     (RomDisable), a

@@ -56,18 +56,25 @@ Emulation = 1
 
 usr:
 	di			; don't want to muck about with the ROM...
+				; so we're disabling all interrupts which
+				; would bring us there...
 
 	ld	a, #'O
-	call	PutCh
+	call	PutCh		; Self test output
 
 	ld	sp, #STACK	; since we're in our own thing, and don't care to
 				; return to BASIC, let's set up a new stack
 			
 	ld	a, #'k
-	call	PutCh
+	call	PutCh		; Self test output
 	ld	a, #'.
-	call	PutCh
-	call	PrintNL
+	call	PutCh		; Self test output
+	call	PrintNL		; Self test output
+
+	; ""		something bad happened with disabling interrupts
+	; "O"		Stack might be messed up
+	; "Ok"		New stack worked once
+	; "Ok.\n"	Stack and everything is AOK.
 
 splash:
 	ld	hl, #str_Splash
@@ -110,6 +117,10 @@ CmdTable:
         .word   CMDEntry, cQuit, fQuit           ; 'quit'
         .word   CMDEntry, cQuit2, fQuit          ; 'quit'
 .endif
+	.word	CMDEntry, cEnab, fEnab		; 'rom0000'
+	.word	CMDEntry, cDisab, fDisab	; 'ram0000'
+	.word	CMDEntry, cGo0, fGo0		; 'go0'
+	.word	CMDEntry, cGoCPM, fGoCPM	; 'gocpm'
         .word   CMDEnd, 0, fWhat                     ; (EOL, bad cmd)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -124,13 +135,14 @@ fHelp:
 	ret
 
 str_help:
-	.ascii "cmds:  "
+	.ascii "cmds:\r\n  "
 .if( Emulation )
-	.ascii "quit "
+	.ascii "quit, "
 .endif
-	.ascii	"help ? :HEX\r\n"
+	.ascii	"rom0000, ram0000, "
+	.ascii	"go0, gocpm, "
+	.ascii	"help, ?, :<hex>\r\n"
 	.asciz	"\r\n"
-
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -143,6 +155,40 @@ fQuit:
 	call	ExitEmulation
         halt                    ; rc2014sim will exit on a halt
 .endif
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; rom enable/disablers
+
+cEnab:	.asciz	"rom0000"
+fEnab:
+	jp	EnableROM
+
+
+cDisab:	.asciz	"ram0000"
+fDisab:
+	jp	DisableROM
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+EpCPM	= 0xFA00
+Ep0000	= 0x0000
+
+; GO 0 (new rom, old rom)
+
+cGo0:	.asciz	"go0"
+fGo0:
+	jp	Ep0000
+
+
+; GO FA00 (64k bios for CPM)
+
+cGoCPM:	.asciz	"gocpm"
+fGoCPM:
+	jp	EpCPM
+
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -242,17 +288,244 @@ __plLaunch:
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+        ;;;;;;;;;;;;;;;
+        ; Hex parser
+        ; attempt to parse the LBUF as a hex string
+        ;
+        ;       :<byteCount><addr><type><data><csum>
+        ;       byteCount =     1 byte          NumBytes( <data> )
+        ;       address =       2 bytes         destination address
+        ;       type =          1 byte
+        ;               0x00    data to install
+        ;               0x01    end of file
+        ;       data =          N bytes         where N == byteCount
+        ;       csum =          1 byte          twosCompliment( sum( [<byteCount>..<data>] ) )
+        ;
+        ;       twosCompliment( x ) = { invertBits( x ) + 1 }
+; eg:
+;
+;       :10010000214601360121470136007EFE09D2190140
+;       :100110002146017E17C20001FF5F16002148011928
+;       :00000001FF
+;
+; field breakdown:
+;         bc addr ty data                             csum
+;       : 10 0100 00 214601360121470136007EFE09D21901 (40)
+;       : 10 0110 00 2146017E17C20001FF5F160021480119 (28)
+;       : 00 0000 01 (FF)
+;
+;
+;       :0C9000003E48CD46003E49CD460018FE1B
+;       :00000001FF
+;
+;       :0C-9000-00-3E 48 CD 46 00 3E 49 CD 46 00 18 FE 1B
+;       :00 0000 01 FF
+
+
+
+; field type identifiers
+HEXF_DATA       = 0x00
+HEXF_END        = 0x01
+
+
+AddToCSUM:
+        push    af
+        push    bc
+        ld      c, a            ; c = new item
+        ld      a, (#LBUF)      ; a = previou value
+        add     a, c            ; a = sum of the two above
+        ld      (#LBUF), a      ; store it 
+
+        pop     bc
+        pop     af
+
+        ret
+
 ProcessHex:
-	rst	0
-	; fly code into here
-	ret
+        xor     a               ; clear the checksum accumulator
+        ld      (#LBUF), a
+
+        inc     hl              ; go to the second byte (past the ':')
+
+        call    ReadHLInc
+        call    AddToCSUM
+        ld      b, a            ; store number of bytes
+
+        call    ReadHLInc
+        call    AddToCSUM
+        ld      d, a            ; Addr bottom
+        call    ReadHLInc
+        call    AddToCSUM
+        ld      e, a            ; Addr top
+
+        call    ReadHLInc       ; type field
+        call    AddToCSUM
+
+        cp      a, #HEXF_DATA   ; Handle a Data field
+        jr      z, __phData
+
+        cp      a, #HEXF_END    ; Handle a End field
+        jr      z, __phEnd
+
+        jp      __phEF          ; ERROR: unknown field
+
+;;;;;;;;;;;;;; HEX DATA
+__phData:
+        ld      a, #'D
+        call    PutCh
+        call    PrintNL
+
+__phD0:
+        ld      a, b
+        cp      #0x00           ; special case handling
+        jr      z, __phLEX
+
+        ; b has number of bytes
+        ; de is the start location
+        call    ReadHLInc       ; read byte into a
+        call    AddToCSUM
+        ld      (de), a
+        inc     de
+        djnz    __phD0
+
+__phLEX:
+        ; ok.  Now the #LBUF[0] contains the sum
+        call    ReadHLHex       ; now a contains passed in CSUM
+
+        ; compute our CSUM
+        ld      c, a            ; c = good checksum
+        ld      hl, #LBUF
+        ld      a, (hl)         ; a = our sum
+        xor     a, #0xFF        ; a = invert(our sum)
+        ld      b, #1
+        add     a, b            ; a = our checksum
+
+        cp      a, c
+        jr      z, __phOK       ; OK checksum!
+
+__phCSUM:
+        ; checksum error
+        call    PrintByte
+        ld      a, #'=
+        call    PutCh
+        ld      a, c
+        call    PrintByte
+        ld      hl, #str_ErrCSUM
+        call    Print
+        ret
+
+        ; ok!
+__phOK:
+        push    de
+        pop     hl
+        call    PrintHL
+        ld      hl, #str_OK
+        call    Print
+        ret
+
+str_ErrCSUM:
+        .asciz  ": ERROR: Bad checksum.\r\n"
+
+str_OK:
+        .asciz  ": OK.\r\n"
+
+
+;;;;;;;;;;;;;; HEX END
+__phEnd:
+        ld      a, #'E
+        call    PutCh
+        call    PrintNL
+        ret
+
+        ; do nothing.  just ignore the line.
+
+__phEF:
+        ld      a, #'F
+        jr      __phError
+__phE0:
+        ld      a, #'0
+__phError:
+        ld      hl, #str_err
+        call    Print
+        call    PutCh
+        call    PrintNL
+        ret
+
+
+str_err:
+        .asciz  "\r\nHex error: "
+
+ReadHLInc:
+        call    ReadHLHex
+        inc     hl
+        inc     hl
+        ret
+ReadHLHex:
+        push    hl
+        push    bc
+        ; top nibble
+        ld      a, (hl)
+        call    AtoInt
+        sla     a
+        sla     a
+        sla     a
+        sla     a
+        ld      b, a
+
+        ; bottom nibble
+        inc     hl
+        ld      a, (hl)
+        call    AtoInt
+
+        ; combine
+        add     a, b
+        pop     bc
+        pop     hl
+        ret
+
+
+AtoInt:
+        cp      #'0
+        jr      c, __ai0        ; < 0, bail
+        cp      #'9+1
+        jr      c, __ai9        ; 0..9!
+        cp      #'A
+        jr      c, __ai0        ; ':'..'@', bail
+        cp      #'F+1
+        jr      c, __aiF        ; A..F!
+        cp      #'a
+        jr      c, __ai0        ; 'G'..'`', bail
+        cp      #'f+1
+        jr      c, __aif        ; a..f!
+        ; > 'f', bail
+__ai0:  ; return a 0 (for error)
+        ld      a, #0
+        ret
+
+__ai9:  ; 0..9
+        sub     a, #'0
+        ret
+
+__aiF:  ; A..F
+        sub     a, #'A
+        add     a, #10
+        ret
+
+__aif:  ; a..f
+        sub     a, #'a
+        add     a, #10
+        ret
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; strings
 
-str_Splash:	.ascii	"Lloader  v0.01 (c)2017 \r\n"
+str_Splash:	.ascii	"Lloader  v0.20 (c)2017 \r\n"
 		.asciz	"  Scott Lawrence - yorgle@gmail.com"
+
+; 0.20	first version with HEX, go0, gocpm
+; 0.01	preliminary versions
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -260,4 +533,5 @@ str_Splash:	.ascii	"Lloader  v0.01 (c)2017 \r\n"
 .include "rc2014hw.asm"
 .include "linebuf.asm"
 .include "string.asm"
+.include "print.asm"
 .include "pointers.asm"

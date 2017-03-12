@@ -105,6 +105,7 @@ if( $l == 5 ) {
 }
 printf OF "999\n";
 $lt = localtime;
+$line++;		# fix for "9100 DATA 999" error
 printf OF "%d REM - Created %s\n", $line, $lt;
 
 close OF;

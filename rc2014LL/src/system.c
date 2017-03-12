@@ -13,7 +13,6 @@
 #include <stdlib.h>
 #include "defs.h"	/* z80 emu system header */
 #include "rc2014.h"	/* common rc2014 emulator headers */
-#include "storage.h"	/* SD card via serial port */
 
 
 /* ********************************************************************** */
@@ -133,7 +132,6 @@ void io_input(z80info *z80, byte haddr, byte laddr, byte *val )
 void io_init( z80info * z80 )
 {
     mc6850_console_init( z80 );
-    MassStorage_Init();
 
     /* set up the port io */
     ports_init();
@@ -147,12 +145,6 @@ void io_init( z80info * z80 )
     writePorts[ kMC6850PortControl ] = mc6850_out_to_console_control;
     readPorts[ kMC6850PortRxData ] = mc6850_in_from_buffered_console_data;
     readPorts[ kMC6850PortStatus ] = mc6850_in_from_buffered_console_status;
-
-    /* mass storage */
-    writePorts[ kMassPortControl ] = MassStorage_Control;
-    writePorts[ kMassPortTxData ] = MassStorage_TX;
-    readPorts[ kMassPortStatus ] = MassStorage_Status;
-    readPorts[ kMassPortRxData ] = MassStorage_RX;
 
     /* emulator interface */
     writePorts[ 0xEE ] = HandleEmulationControl;
