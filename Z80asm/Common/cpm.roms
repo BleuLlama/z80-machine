@@ -1,0 +1,22 @@
+# program space
+begin program
+0x0000  0x2000  boot.rom	program_1
+0x2000  0xBC00	tpa.rom		program_2
+0xDC00	0x0800	ccp.rom		program_3
+0xE400	0x0E00	bdos.rom	program_4
+0xF200	0x0E00	bios.rom	program_5
+end
+
+# graphics roms
+begin graphics
+end
+
+# color proms
+begin color
+end
+
+# sound proms
+begin sound
+end
+
+
