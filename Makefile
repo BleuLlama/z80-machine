@@ -12,6 +12,7 @@ all:	emus
 emus:
 	@echo "Building Projects"
 	for dir in $(PROJDIRS); do \
+		echo "== Working in $$dir";\
                $(MAKE) -C $$dir; \
              done
 clean:
