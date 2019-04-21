@@ -78,7 +78,6 @@ byte mc6850_in_from_console_data( void )
 byte mc6850_in_from_console_status( void )
 {
     byte val = 0;
-    int available = 0;
 
 #ifdef FILTER_CONSOLE
     /* incompatible with FILTER */
@@ -86,8 +85,6 @@ byte mc6850_in_from_console_status( void )
     printf( "use mc6850_in_from_buffered_console_status() instead!\n" );
     exit( -1 );
 #endif
-
-    available = Host_KeyHit();
 
     if( Host_KeyHit() ) {
 	    val |= kPRS_RxDataReady; /* key is available to read */
