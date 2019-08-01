@@ -1,0 +1,8 @@
+
+Reported:
+
+1: Filter_ToRemotePutString() seems to lose the first two bytes on the remote
+
+
+
+Fixed:

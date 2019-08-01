@@ -1,0 +1,520 @@
+----------------------------------------
+                              SSDD1 v005
+
+                         Serial SD Drive
+                                 2016-10
+
+                          Scott Lawrence
+                        yorgle@gmail.com
+
+
+----------------------------------------
+                                Overview
+
+The SSDD1 has been designed to be a serial-based mass storage device
+for the RC2014/LL computer. It is meant to talk over a standard
+serial interface at 115200 baud.
+
+The initial implementation of this is via an Arduino Pro Micro,
+connected directly to a level-shifting SD card interface. It has
+three LEDs on the drive board, red, yellow, and gren, which can
+indicate various states of operation.
+
+The protocol described here supports multiple drives on the same
+serial chain.
+
+
+----------------------------------------
+                                 Arduino
+
+The project has been built using Arduino 1.6.11 IDE.
+
+The Arduino's pin configuration is as follows:
+
+- D0 - Serial RX to the host computer
+- D1 - Serial TX to the host computer
+
+- D3 - Red LED - with a 2.2k resistor - to +5v
+- D5 - Amber LED - with a 2.2k resistor - to +5v
+- D6 - Green LED - with a 2.2k resistor - to +5v
+
+- D8 - SD card select
+- D9 - SD present switch
+- D10 - SD Card Select
+- D11 - SD MOSI
+- D12 - SD MISO
+- D13 - SD Clock
+
+
+----------------------------------------
+                                    LEDs
+
+The LED indicators mean as follows:
+
+- All off - device is off or resetting.
+- Fast red pulsing - no SD card is present
+- Slow green pulsing - SD card is present and is OK
+- Solid red - device has a file open for write
+- Solid amber - device has a file open for read
+
+
+----------------------------------------
+                                Protocol
+
+The SSDD1 talks on TTL level serial at 115200 baud, 8 bits, No
+parity, 1 stop bit. (115200 8N1). 
+
+
+NOTE: Although it runs at such a fast baud rate, there is throttling
+      in the code such that it will not overload the host Z80
+      computer. This can be removed for other applications.
+
+On startup, or device reset, it may send:
+
+    -0:N0=SDD1,v004
+    -0:E0=No card
+
+Drive zero (-0:). all drives emit drive '0' and respond to drive '0'.
+
+    * Notice (Nx=) that it is SDD1 version 004
+    * Error (Ex=)0: No card is inserted.
+
+All drives identify as device zero. Their visible device ID to the
+host is determined by their position in the serial chain. The first
+device after the host on the chain is device 0. Next is device 1,
+and so on.
+
+Notices start with "N" and errors start with "E". After that, the
+next character is the error code. Next is an equals sign, and then
+text, possibly comma separated, until a newline.
+
+Note that it may also send empty lines, that can be ignored.
+
+If you power it on with no card inserted, it will respond with the
+N0 notice as above, but also with Error code 0, as above.
+
+Once a card has been inserted, it may send something like:
+
+    -0:N0=SDD1,v005
+    -0:N1=Card OK
+    -0:Nt=FAT16
+    -0:Ns=952,meg
+
+It's pretty obvious what these responding fields mean. See the
+Appendices below for more explanation of them.
+
+All commands sent to devices are prefixed with a tilde '~' character,
+while all responses from devices are prefixed with a dash '-'
+character.
+
+All devices respond as device 0. If a device gets a command for
+not-zero, the message's id is decremented and then re-transmitted.
+If a device gets a response, it will increment the message's id and
+then retransmitted.
+
+For example, if we have a setup with three drives, like so:
+
+[Host computer] ---> [Drive A] ---> [Drive B] ---> [Drive C] --> (return)
+      ^                                                             |
+      +-------------------------------------------------------------+
+
+And the host wants to send the request message for Information from
+drive B, it will send:
+
+	~1:I
+
+Drive A gets this, sees that the ID is '1', and not for it, so it
+decrements that ID and re-sends the message. It will send out:
+
+	~0:I
+
+Next, Drive B gets this, sees that the ID is '0', which it identifies
+as! So it generates some response and sends it out with the ID of
+0 as well:
+
+	-0:N0=SDD1,v004
+	-0:Nt=FAT16
+
+Next, Drive C gets this, sees that it's just a response, so it
+passes it along down the chain, after incrementing the ID in the
+message.
+
+	-1:N0=SDD1,v004
+	-1:Nt=FAT16
+
+Which is what the host gets back. It should be noted that for sending
+out messages, device 0 is the first on the chain, while for responses,
+drive 0 is the last on the chain.
+
+Note: The drive emulator responds with a drive type (Nt) of "FAT42".
+
+
+------------------------------
+                      Commands
+
+Commands are sent from the host computer to the SSDD1. They are
+sent as ASCII text, with the first character being a ~ and the last
+character being a newline.
+
+It is valid to send blank lines. The commands are grouped by type
+and by letter.
+
+
+--------------------
+       Info commands
+
+~0:I
+	Respond with drive info. Usually the notice sequence:
+	N0, N1, Nt, Ns
+
+	Example:
+
+	    ~0:I
+	    -0:N1=Card OK
+	    -0:Nt=FAT16
+	    -0:Ns=952,meg
+
+
+--------------------
+       Path commands
+
+~0:PL=<path>
+	List the files in the specified path. It will list all
+	files and directories in up to 8.3 format.
+
+	Responds with an "PB=" notice. The content of this notice
+	is the path that is being read. Then on consecutive lines,
+	it contains one file or directory name per line. It then
+	ends with a "PE=" notice, where the content is the number
+	of files,subdirectories in decimal.
+
+	Each line will contain the <SUBDIR>+"/" if the preceeding
+	path information is of a subdirectory.
+
+	Each line will contain the <FILENAME>,<number of bytes> if
+	the FILENAME is of a file.
+
+	Example:
+
+	    ~0:PL=BASIC
+	    -0:PB=BASIC
+	    -0:PF=LLTEST.BAS,963
+	    -0:PF=USRTEST.BAS,4571
+	    -0:PD=Misc/
+	    -0:PE=2,1
+
+	NOTE that the content of the PF and PD items are completely ASCII 
+	encoded, and may actually appear on the wire like this:
+
+	    -0:PB=BASIC/
+	    -0:PD=4241534943
+	    -0:PF=726561646d652e7478742c373432
+	    -0:PD=524f4d73
+	    -0:PF=746573742e7478742c3232
+	    -0:PE=2,2
+
+	Similar to "dir" or "ls"
+
+
+~0:PM=<path>
+	Create a subdirectory with the path specified. 
+
+	Example:
+	
+	    ~0:PM=FOOBAR
+	    -0:N2=OK
+
+	Similar to "mkdir"
+
+
+~0:PR=<path>
+	Delete a file or empty subdirectory. If it cannot remove
+	the file or subdirectory, it responds with E6.
+
+	Example:
+
+	    ~0:PR=FOOBAR
+	    -0:N2=OK
+
+	Similar to "rm", "rmdir", "del"
+
+
+--------------------
+       File commands
+
+Files are transferred over the wire in Asciified HEX values. The 
+data will be reconstructed on either end.
+
+The content, as it passes over the wire, will be converted to Ascii
+Hex values. The only valid content is the characters '0'-'9',
+'A'-'F'. Newlines may be present on the transferred data and should
+be ignored.
+
+
+~0:FR=<path>
+	Opens the file at <path> on the SD card for raw reading.
+
+	The file will be streamed from the SSDD1 to the host. File
+	content will be between "FB" and "FE" tags, provided as
+	ASCII HEX values, defined with FS tags. (See the example
+	below.
+
+	The FB tag's contents will be the path to the file specified.
+	The FE tag's contents will be the number of bytes read.
+
+	If the file cannot be found, "E9" will be returned.
+
+	Example:
+
+	    ~0:FR=test.txt
+	    -0:FB=test.txt
+	    -0:FS=48656C6C6F2C20776F726C64210A0A3A440A0A2D
+	    -0:FS=730A
+	    -0:FE=22
+	    -0:N2=OK
+
+	Note: There may be additional optional content sent between
+	the FP, FB and FE tags to assist in progress displays and
+	such. Here's an example from a larger file:
+
+
+	    ~0:FR=readme.txt
+	    -0:FB=readme.txt
+	    -0:FS=0A2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D0A4D69
+	    -0:FS=63726F4C6C616D6120353030300A323031362D30
+	    -0:FS=372D31350A53636F7474204C617772656E63650A
+	    -0:FS=796F72676C6540676D61696C2E636F6D0A2D2D2D
+	    -0:FS=2D2D2D2D2D2D2D2D2D2D2D2D2D0A0A5468697320
+	    -0:FP=100/742
+	    -0:FS=6973207468652064656661756C7420534420636F
+	    -0:FS=6E74656E747320666F7220746865205243323031
+	    .......
+	    -0:FS=6C65206469736B20696D61676520636F6E74656E
+	    -0:FS=74730A20202020534644492F43094469736B2044
+	    -0:FP=700/742
+	    -0:FS=20736563746F722066696C65206469736B20696D
+	    -0:FS=61676520636F6E74656E74730A202020202E2E2E
+	    -0:FS=0A0A
+	    -0:FE=742
+
+	You can see the additional NP tags in there showing
+	file progress notification. The two fields are: 
+
+	    (current byte count)/(total file size)
+
+	These fields, along with the contents of FE are all decimal
+	values.
+
+
+~0:FW=<path>
+	Opens the file at <path> on the SD card for writing. If the
+	file exists already, subsequent writes will occur at the
+	end of the file. The file will remain open (and may not get
+	flushed) until the FC close command is sent.
+
+	If the file cannot be opened, "EA" will be returned.
+
+	Example:
+	    (see FS example below)
+
+~0:FS=<string to newline>
+	Send the string to be written to the SD card. It should be
+	in Asciified binary format. Only characters in the valid
+	range as explained above will be observed. Each string sent
+	must contain an even number of valid characters.
+
+	OK:  129AB92AB110BD01
+	OK:  129 AB 92AB 110helloBD01
+	BAD: 129AB92AB110BD 1
+
+	If a bad string is sent, the device will ignore the last
+	nibble sent. It will respond with "E7", and writing will
+	resume.
+
+	If no file is open, it will respond with "E8".
+
+	the response for each line passed is a Nc tag, whose two
+	parameters are the number of bytes (10 in the example that
+	follows, then the checksum of the actual data (not the ASCII
+	sent) which is computed the same way as with the Intel Hex
+	File (HEX,IHX) format. (All of the bytes are summed, then
+	the LSByte of the sum's twos-compliment value is taken of
+	it. (See Appendix C for more info.) Both values are in hex.
+
+	Example:
+	    ~0:FW=newfile.txt
+	    -0:N2=OK
+	    ~0:FS=30313233343536373839
+	    -0:Nc=x0A,x9A
+	    ~0:FS=40414243444546474849
+	    -0:Nc=x0A,x33
+	    ~0:FC
+	    -0:N2=OK
+
+	The checksum and number of bytes are in hexidecimal and are
+	prepended by an 'x' to indicate this.
+
+~0:FC
+	Closes the currently open file for read or write. Does
+	nothing if no file is open. It should always succeed.
+
+	Example:
+	    (see FS example above.)
+
+
+--------------------
+     Sector commands
+
+These commands are used to write and read from virtual drives. They
+will operate on 128 byte sectors, to match CP/M. The drive, track,
+sector specified are expected to be in the form:
+
+	 drive: 'A' - 'Z'
+	 track: '0000' - '9999'
+	sector: '0000' - '9999'
+
+However, due to implementation it can be any string in any of those
+three locations. For this document, these three parameters will be
+referred to as simply "DTS".
+
+For ease of operation and transferring data, Sector commands use
+their own
+
+~0:SR=<drive>,<track>,<sector>
+	Sector read from specified DTS. The content transferred
+	will be in asciified binary format, as explained above.
+	The content will be between Nbs and Nes notice tags
+
+	Example:
+	    ~0:SR=A,0002,0301
+	    -0:SB=
+	    -0:SS=00000000000000000000000000000000
+	    -0:SS=00000000000000000000000000000000
+		...
+	    -0:SS=00000000000000000000000000000000
+	    -0:SE=128
+
+~0:SW=<drive>,<track>,<sector>
+	Sector open for write to specified DTS. Operates as FW
+	above.
+
+	Example:
+	    (See SS example below)
+
+
+~0:SS=<string to newline>
+	Sector data to write to the currently open file. The content
+	and formatting are identical to ~0:FS above.
+
+	Example:
+	    ~0:SW=A,0002,0301
+	    -0:N2=OK
+	    ~0:SS=00000000000000000000000000000000
+	    -0:Nc=x10,x9A
+	    ~0:SS=00000000000000000000000000000000
+	    -0:Nc=x10,x9A
+		...
+	    ~0:SS=00000000000000000000000000000000
+	    -0:Nc=x10,x9A
+	    ~0:SC
+	    -0:N2=OK
+
+	The values returned in Nc are explained above in "FS".
+
+
+~0:SC
+	Closes the currently open sector file for write. Does nothing
+	if no file is open. It should always succeed.
+
+	Example:
+	    (See SS example above)
+
+
+----------------------------------------
+                     Appendix A: Notices
+
+	N0	"SSDD1,v004"
+		Notice of device ID and version
+	N1	"Card OK"
+		Card functional/readable
+	Nt	"FAT16"
+		Filesystem type (FATxx)
+	Ns	"100,meg"
+		Drive size,units
+
+
+----------------------------------------
+                      Appendix B: Errors
+ 
+
+	E0	"No card"
+		No card is inserted or detected
+	E1	"SD Init failed"
+		SD card initialization failed
+	E2	"No FAT"
+		No FAT filesystem found
+	E3	"Nope"
+		General Error.
+	E4	"Bad Line"
+		Line could not be read from host
+	E5	(Variable contents)
+		Echo of erroroneous data
+	E6	"Failed"
+		General Failure
+	E7	"Nibbles"
+		Bad ASCII nibble count
+	E8	"No WR"
+		No file open for write
+	E9	"FNF"
+		File not found
+	EA	"FNWR"
+		File not writable
+		
+
+----------------------------------------
+                  Appendix C: IHX Format
+
+The two primary types of IHX records are:
+
+	00 - Data
+	01 - End Of File
+
+<colon><number of bytes><start address><record type><data><checksum>
+
+The checksum is computed by summing each individual byte from the
+entire record between the colon and the checksum. Then the twos
+compliment of the LSB of the sum is the checksum.
+
+For example, the data record:
+
+	:0300300002337A1E
+	:--____--======++
+
+Can be separated into fields:
+    - number of bytes of data: 0x03
+    - start address: 0x0030
+    - record type: 0x00  (Data)
+    - data (3 bytes as defined): 0x02, 0x33, 0x7A
+    - checksum: Comp2( 0x03 + 0x00 + 0x30 + ... + 0x33 + 0x7A) = 0x1E
+	    Comp2 = (invert all bits, add 1)
+
+Here's an example End of File record:
+
+	:00000001FF
+	:--____--++
+
+Which should be identical to every end of file record. ;)
+    - number of bytes of data: 0x00 (no data bytes)
+    - start address: 0x0000 (no start address)
+    - record type: 0x01 (End of File record)
+    - checksum: Comp2( 0x00 + 0x00 + 0x00 + 0x01 ) = 0xFF
+
+
+----------------------------------------
+             Appendix D: Version History
+
+v005  2016-10-14 - Consistency changes for messages, formatting
+v004  2016-10-10 - Sector IO docs added
+v003  2016-10-09 - File IO docs added
+v002  2016-10-08 - Initial new version, P commands
+v001  2016-10-01 - Internal version, old xfer protocol
