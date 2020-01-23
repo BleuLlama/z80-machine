@@ -41,6 +41,31 @@ void regions_display( MemRegion * m )
 }
 
 
+#include <unistd.h>
+#include <sys/types.h>
+#include <pwd.h>
+
+
+
+FILE * regions_findAndOpen( char * filename, const char * mode )
+{
+	const char *homedir;
+
+	char buf[512];
+
+	FILE * fp = fopen( filename, mode );
+	if( fp ) {
+		return fp;
+	}
+
+	if ((homedir = getenv("HOME")) == NULL) {
+		homedir = getpwuid(getuid())->pw_dir;
+	}
+	sprintf( buf, "%s/%s", homedir, filename );
+	return fopen( buf, mode );
+}
+
+
 /* regions_init
  *
  * 	load in ROMs, allocate memory, all that stuff
@@ -66,7 +91,7 @@ void regions_init( MemRegion * m, byte * z80mem )
 
 	if( m->mem && (m->loadFileName != NULL) ) 
 	{
-	    fp = fopen( m->loadFileName, "rb" );
+	    fp = regions_findAndOpen( m->loadFileName, "rb" );
 	    if( fp )
 	    {
 		size_t nbytes = fread( m->mem, 1, m->length, fp );
