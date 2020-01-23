@@ -8,6 +8,10 @@
 #include <stdio.h>
 #include "mc6850_console.h"     /* port bit definitions */
 
+
+/* initialization stuff */
+void Host_Init( z80info * z80 );
+
 /* send a byte of data to the actual console */
 void Host_PutChar( byte data );
 

@@ -10,6 +10,11 @@
 #include <sys/time.h>           /* for timeval */
 #include "mc6850_console.h"     /* port bit definitions */
 
+/* initialization stuff */
+void Host_Init( z80info * z80 )
+{
+	printf( "Host_Init()\n" );
+}
 
 /* send a byte of data to the actual console */
 void Host_PutChar( byte data )

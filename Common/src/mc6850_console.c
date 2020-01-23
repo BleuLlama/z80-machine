@@ -29,6 +29,7 @@ void mc6850_console_init( z80info * z80 )
 #else
     /* do nothing */
 #endif
+	Host_Init( z80 );
 }
 
 /* send out a byte of data */
