@@ -8,13 +8,8 @@
 #include <stdio.h>
 #include <string.h>		/* for strlen() */
 #include "mc6850_console.h"
+#include "config.h"
 #include "filter.h"
-
-////////////////////////////////////////
-// Autoboot stuff
-
-#define kAutoBootPhrase		"Memory top? 0"
-#define kAutoBootCommand	"boot"
 
 
 ////////////////////////////////////////
@@ -44,7 +39,10 @@ static size_t FC_TRPos = 0;
 void Filter_Init( z80info * z80 )
 {
 #ifdef FILTER_CONSOLE
-    printf( "Initializing Filter.\n" );
+    printf( "--------------------------------------------\n" );
+    printf( "Type '0' for memory size to trigger autoload.\n" );
+	printf( "Autoload file: %s%s\n", kHomePath, kBootFile );
+    printf( "--------------------------------------------\n\n" );
 #endif
 }
 

@@ -12,35 +12,10 @@ ABPASS	   = 0x117D
 
 .org	0xF800
 usr:
-	call	DEINT
-	ld	a, e
-	cp	#10
+	ld	a, r		; a = r
+	inc	a		; a++
+	ld	r, a		; r = a
 
-	jr 	c, usr_00
-
-	ld	a, #'H
-	out	(TermData), a
-	ld	a, #'I
-	out	(TermData), a
-	ld	a, #0x0d
-	out	(TermData), a
-	ld	a, #0x0a
-	out	(TermData), a
-
-	ld	a, #0
-	ld	b, #42
-
-	jr 	usr_ret
-
-usr_00:
-	inc	de
-	ld	a, d
-	ld	b, e
-
-usr_ret:
-	call	ABPASS
-
-	ret
-
-
-
+	ld	b, a
+	xor	a
+	jp	ABPASS

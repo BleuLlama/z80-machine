@@ -22,6 +22,7 @@ MemRegion mems[] =
 {
     /* 0x1000 = 4kbytes */
     { 0x0000, (32 * 1024), REGION_RO, REGION_ACTIVE, NULL, 
+		//"ROMs/iotest.rom" },
 		//"ROMs/selftest.rom" },
 		//"ROMs/lloader2.rom" },
 		"ROMs/basic32.rom" },

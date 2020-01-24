@@ -262,18 +262,21 @@ loop:    /* "infinite" loop */
     switch (isupper(*s) ? tolower(*s) : *s)
     {
     case '?':                    /* help */
-        printf("   Q(uit)  T(race on/off)  S(tep trace)  D(ump regs)\n");
-        printf("   E(xamine memory)  P(oke memory)  R(egister modify)\n");
-        printf("   L(oad binary)  C(ontinue running - <CR> if Step)\n");
-        printf("   G(o) ");
+        printf("   (q)uit  (t)race on/off  (s)tep trace  (d)ump regs\n");
+        printf("   (e)xamine memory  (p)oke memory  (r)egister modify\n");
+        printf("   (l)oad binary  (c)ontinue running - <CR> if Step)\n");
+        printf("   (g)o (h)ard Reset (z)80 disassembled dump\n");
 #ifdef BUILD_CPM
-        printf(         "B(oot CP/M) ");
+        printf( "  (b)oot CP/M ");
 #endif
-        printf(                      " Z(80 disassembled dump)\n");
-        printf("   W(write memory to file)  X,Y(-set/clear breakpoint)\n");
-        printf("   O(output to \"logfile\")\n\n");
-        printf("   !(fork shell)  ?(command list)  V(ersion)\n\n");
+        printf("   (w)write memory to file  (x),(y)-set/clear breakpoint\n");
+        printf("   (o)output to \"logfile\"\n\n");
+        printf("   (!)fork shell  (?)command list  (v)ersion\n\n");
         break;
+
+	case 'h':
+		RESET = 1;
+		break;
 
     case 'o':
         if (logfile != NULL)

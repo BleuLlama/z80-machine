@@ -47,6 +47,10 @@ printf ">>  %d items processed.\n", scalar @program;
 printf ">>  Found %d lines of code.\n", $lines;
 printf ">>  Generating %s for 0x%s\n", $destfn, $baseram;
 
+if( -e "usrstrap.bas" ) {
+	`cp usrstrap.bas $destfn`;
+	open OF, ">>$destfn";
+} else {
 
 open OF, ">$destfn";
 
@@ -75,7 +79,7 @@ print OF <<EOP;
 270 end
 
 EOP
-
+}
 
 printf OF "9000 REM == program == \n";
 printf OF "9001 DATA ";
@@ -93,7 +97,7 @@ foreach $byte (@program)
     printf OF hex $byte;
 
     if( $l < 10 ) { 
-	printf OF ", ";
+	printf OF ",";
     } else {
 	$line += 1;
 	printf OF "\n%d DATA ", $line;

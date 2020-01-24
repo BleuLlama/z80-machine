@@ -152,7 +152,9 @@ initwb8:
 disableRom:
 	; currently this is OK, when we switch to the official RC2014 pageable
 	; ROM/0x0000 RAM interface, we'll need to add in a check here to confirm
-	; we're in ROM or RAM mode.
+	; we're in ROM or RAM mode, since that design uses a TOGGLE
+	;
+	; my /LL hardware is a SET not a TOGGLE, so this works.
 	ld	a, #01
 	out	(RomDisable), a
 	ret

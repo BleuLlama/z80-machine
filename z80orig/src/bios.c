@@ -818,7 +818,7 @@ closeunix(z80info *z80)
 static void
 finish(z80info *z80)
 {
-	resetterm();
+	z_resetterm();
 	exit(0);
 }
 

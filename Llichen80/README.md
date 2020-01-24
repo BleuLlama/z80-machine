@@ -70,6 +70,41 @@ per the design of the Pageable ROM module
 
 # LlamaSuper - Console and Mass Storage Interface
 
+For emulation, there are two parts of the entire system.  There's
+this half which runs as emulation, and there's a python program
+which will run ultimately on a raspberry pi, but also runs here.
+It is based on pyterm's tool "miniterm.py".
+
+For emulation, we run the Llichen 80 emulator with its 6850 console
+working with a socket interface running on port 6850, presenting
+the console on that IP port.
+
+For emulation, build this with the CFLAG of -DMC6850_SOCKET.  Then
+connect to it with miniterm, like so:
+
+    python llminiterm.py socket://localhost:6850
+
+You should see the interface appearing over there as well as locally.
+Since this is a "good enough" interface, some things like emulator
+control itself is not implemented over the socket connection.  You 
+may need to manually kill the emulator or python or both.
+
+Do note that if the emulator cannot establish a socket on port 6850,
+it will advance to port 6851 and so on until it works, or until it
+fails trying 15 consecutive ports. ;)
+
+In "real use", on a raspberry pi, the python program will be run
+like so:
+
+    python llminiterm.py /dev/serial0 115200
+
+Be sure to have your "LL" directory in your home directory.  The
+ROM for the emulator as well as the other support files will be
+served out from there.
+
+
+
+# The following are not accurate yet.
 
 # LlamaBDOS - Mass Storage Interface
 

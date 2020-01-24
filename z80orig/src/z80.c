@@ -210,6 +210,9 @@ infloop:
 			RESET = FALSE;
 			if (NMI || INTR)	/* catch these the next time */
 				EVENT = TRUE;
+#ifdef RESET_HANDLER
+			reset_handle( z80 );
+#endif
 		}
 		else if (NMI)			/* non-maskable interrupt */
 		{

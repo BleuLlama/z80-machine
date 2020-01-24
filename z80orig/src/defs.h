@@ -11,7 +11,7 @@
 #include <stdio.h>
 
 /* the current version of the z80 emulator */
-#define VERSION "3.1.1 (A)"
+#define VERSION "3.1.1 (B)"
 
 
 /* system definitions */
@@ -176,6 +176,11 @@ typedef struct z80info
 #ifdef SYSTEM_POLL
 void system_init( z80info * z80 ); /* called when z80 struct is created */
 void system_poll( z80info * z80 ); /* called every opcode */
+#endif
+
+/* If there's a reset handler... */
+#ifdef RESET_HANDLER
+void reset_handle( z80info * z80 );
 #endif
 
 /* If external mem is to be included, we need these protos */

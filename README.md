@@ -37,6 +37,20 @@ which I will do starting from that point, where it is in a
 hardware-generatable platform, rather than a software emulation
 platform, which is where this project started from.
 
+## Emu Shell and Debugger
+
+To interact with the emulator control itself, you have some
+debugging controls and tools via a command shell.  You will 
+see this with the prompt:
+> EMU:
+
+Type a question mark, '?' to see all available tools.  The
+tools will let you examine and poke memory, trace execution,
+reset the emulated machine, etc.
+
+Type g' to start execution, and CTRL-'-' to get back to the 
+emulator prompt.
+
 ## New compile-time defines, hooks
 
 I tried to be as minimally invasive into the original source code as
@@ -91,6 +105,17 @@ FILTER\_CONSOLE
 > content going to and from the console.  This can be used to 
 > remove or inject backchannel content, ansi codes, etc.
 > Implement the few functions at the bottom of 'mc6850\_console.h'
+
+RESET\_HANDLER
+> This flag will enable a function call to reset\_handle() when the
+> emulated CPU is hard-reset
+
+
+MC6850\_SOCKET
+> This flag enables a telnettable socket running on the emulator 
+> which mimics the local console.  You can enter input and get 
+> output from this by telnetting to port 6850.
+
 
 ## Support tools
 

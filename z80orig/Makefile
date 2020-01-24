@@ -13,7 +13,7 @@ DRIVES = ./drives
 UTILS = ./utils
 CC = gcc
 CFLAGS = -O2 -pipe -Wall -DPOSIX_TTY -DLITTLE_ENDIAN -DMEM_BREAK \
-	 -Wno-pointer-sign -Wno-int-to-pointer-cast -DBUILD_CPM
+	 -Wno-pointer-sign -Wno-int-to-pointer-cast -DBUILD_CPM -Wimplicit-function-declaration
 OLD_CFLAGS = -ansi
 LDFLAGS = 
 

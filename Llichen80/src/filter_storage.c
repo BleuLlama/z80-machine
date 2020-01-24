@@ -11,16 +11,12 @@
 #include <string.h>	/* strlen, strcmp */
 #include <time.h>	/* time */
 #include "mc6850_console.h"
+#include "config.h"
 #include "filter.h"
 
 ////////////////////////////////////////////////////////////////////////////////
 // Define stuff
 
-// This is the starting path on our filesystem
-#define kHomePath ("MASS_DRV/BASIC/")
-
-// this is the file autoloaded when "Memory Size? 0"
-#define kBootFile ("boot.bas")
 
 // Path buffer sizes
 #define kBDOSBufSz (1024)

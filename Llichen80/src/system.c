@@ -13,7 +13,7 @@
 #include <stdlib.h>
 #include "defs.h"	/* z80 emu system header */
 #include "rc2014.h"	/* common rc2014 emulator headers */
-
+#include "config.h"	/* z80 emu system header */
 
 /* ********************************************************************** */
 /*  our memory layout */
@@ -23,45 +23,43 @@ MemRegion mems[] =
 	/* memory maps: 
 
 	// MAP 0
-	//	0x0000	0x1fff	8k	ROM	(A)
-	//	0x2000	0x7fff	24k	RAM	(B)
-	//	0x8000	0xffff	32k	RAM	(c)
+	//	0x0000	0x1fff	8k	ROM	(0)
+	//	0x2000	0x7fff	24k	RAM	(2)
+	//	0x8000	0xffff	32k	RAM	(3)
 
 	// MAP 1
-	//	0x0000	0x1fff	8k	ROM	(D)
-	//	0x2000	0x7fff	24k	RAM	(B)
-	//	0x8000	0xffff	32k	RAM	(c)
+	//	0x0000	0x1fff	8k	RAM	(1)
+	//	0x2000	0x7fff	24k	RAM	(2)
+	//	0x8000	0xffff	32k	RAM	(3)
 
 	*/
-	/* 0x1000 = 4kbytes */
-	{ 0x0000, ( 8 * 1024), REGION_RO, REGION_ACTIVE, NULL, "ROMs/basic32.rom" }, // A
-	{ 0x0000, (32 * 1024), REGION_RW, REGION_ACTIVE, NULL, NULL }, // D
+	{ 0x0000, ( 8 * 1024), REGION_RO, REGION_ACTIVE, NULL, kMem0000RomFile }, // 0
+	{ 0x0000, ( 8 * 1024), REGION_RW, REGION_INACTIVE, NULL, NULL }, // 1
 
-	{ 0x2000, (24 * 1024), REGION_RW, REGION_ACTIVE, NULL, NULL }, // B
-	{ 0x8000, (32 * 1024), REGION_RW, REGION_ACTIVE, NULL, NULL }, // C
+	{ 0x2000, (24 * 1024), REGION_RW, REGION_ACTIVE, NULL, NULL }, // 2
+	{ 0x8000, (32 * 1024), REGION_RW, REGION_ACTIVE, NULL, NULL }, // 3
 
 	REGION_END
 };
 
 
-/* romen_update
-	update the rom enable bit
-	returns 1 if it changed
-*/
-int romen_update( const byte val )
+void page_toggle()
 {
-	static byte lastByte = 0;
-
-	if( lastByte == (val & 0x01 )) return 0;
-
-	if( val & 0x01 ) {
+	if( mems[0].active == REGION_ACTIVE ) {
 		mems[0].active = REGION_INACTIVE;
+		mems[1].active = REGION_ACTIVE;
 	} else {
 		mems[0].active = REGION_ACTIVE;
+		mems[1].active = REGION_INACTIVE;
 	}
+}
 
-	lastByte = val;
-	return 1;
+void page_0()
+{
+	mems[0].active = REGION_ACTIVE;
+	mems[1].active = REGION_INACTIVE;
+	mems[2].active = REGION_ACTIVE;
+	mems[3].active = REGION_ACTIVE;
 }
 
 
@@ -78,11 +76,6 @@ void system_init( z80info * z80 )
 	printf( "  Emu and Llichen extensions by Scott Lawrence\n" );
 	printf( "  SBC by Grant Searle\n" );
 	printf( "\n" );
-
-	/* force the ROM to be active */
-	mems[0].active = REGION_ACTIVE;
-	mems[1].active = REGION_ACTIVE;
-	mems[2].active = REGION_ACTIVE;
 }
 
 /* this gets called before each opcode is run. */
@@ -105,7 +98,8 @@ void system_poll( z80info * z80 )
 /* this gets called on cpu reset */
 void reset_handle( z80info * z80 )
 {
-	printf( "SYSTEM RESET!!!!\n" );
+	page_0();
+	regions_display( mems );
 }
 
 /* ********************************************************************** */
@@ -117,10 +111,12 @@ void reset_handle( z80info * z80 )
 void myHandlePortWrite00( const byte data )
 {
 	HandlePortWrite00( data );
+}
 
-	if( romen_update( data )) {
-		regions_display( mems );
-	}
+void myHandlePageableRomToggler( const byte data )
+{
+	page_toggle();
+	regions_display( mems );
 }
 
 
@@ -158,6 +154,9 @@ void io_init( z80info * z80 )
 	writePorts[ 0x00 ] = myHandlePortWrite00;
 	readPorts[ 0x00 ] = HandlePortRead00;
 
+	/* pageable ROM/RAM toggler */
+	writePorts[ 0x38 /* = 56 */ ] = myHandlePageableRomToggler;
+
 	/* Serial IO card */
 	writePorts[ kMC6850PortTxData ] = mc6850_out_to_console_data;
 	writePorts[ kMC6850PortControl ] = mc6850_out_to_console_control;
@@ -184,6 +183,9 @@ void io_init( z80info * z80 )
 void mem_init( z80info * z80 )
 {
 	regions_init( mems, z80->mem );
+
+	/* force the ROM to be active. it should be anyway */
+	page_0();
 }
 
 

@@ -6,7 +6,9 @@ TARG := llichen80emu
 include ../Common/defs.mak
 
 # additional defs
-CFLAGS += -DAUTORUN -DFILTER_CONSOLE -DRESET_HANDLER
+CFLAGS += -DAUTORUN -DRESET_HANDLER 
+# -DMC6850_SOCKET
+# no -DFILTER_CONSOLE
 
 SRCS += $(SRC)/filter.c
 
@@ -22,7 +24,7 @@ $(BUILD)/filter.o:	$(ORIGSRC)/defs.h $(SRC)/filter.c
 $(BUILD)/filter_storage.o:	$(ORIGSRC)/defs.h $(SRC)/filter_storage.c
 
 # additional content for 'all' target...
-all:
+all_withMassStorage:
 	@echo Creating Mass Storage content...
 	@-rm MASS_DRV 2>/dev/null || true
 	@-ln -s ../prg MASS_DRV 2>/dev/null || true

@@ -4,7 +4,7 @@ PROJDIRS := \
 	Z80asm \
 	\
 	rc2014 \
-	rc2014LL \
+	Llichen80 \
 	rc2014SB 
 
 all:	emus

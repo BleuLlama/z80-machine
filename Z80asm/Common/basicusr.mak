@@ -21,6 +21,8 @@ GENFILES := \
 all: $(TARGBAS)
 	@echo "+ copy $(TARGBAS) to BASIC directory"
 	@cp $(TARGBAS) $(BASDIR)
+	@echo "+ pbcopy $(TARGBAS)"
+	@pbcopy < $(TARGBAS)
 
 $(TARGBAS): $(TARGBASE).ihx
 	@echo "+ generate BASIC program from $(TARGLST)"
