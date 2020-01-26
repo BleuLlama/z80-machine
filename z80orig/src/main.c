@@ -35,6 +35,9 @@ word mem_write( z80info * z80, word addr, byte val );
 #endif
 
 
+void Full_Z80Reset( z80info *z80, int inittermtoo );
+
+
 #if defined macintosh
 #    include <Types.h>
 #    include <Events.h>
@@ -1160,9 +1163,40 @@ interrupt(int s)
 }
 
 
+static void
+sigusr1( int s )
+{
+	printf( "\r\n[Caught SIGUSR1: Resetting Target]\r\n");
+	// make sure we're starting at 0!
+	PC = 0;
+	Full_Z80Reset( z80, 1 );
+}
+
+
+void Full_Z80Reset( z80info *z80, int inittermtoo )
+{
+#ifdef SYSTEM_POLL
+    system_init( z80 );
+#endif
+
+	if( inittermtoo ) {
+		z_initterm();
+	}
+
+#ifdef EXTERNAL_IO
+    io_init( z80 );
+#endif
+#ifdef EXTERNAL_MEM
+    mem_init( z80 );
+#endif
+}
+
+
 /*-----------------------------------------------------------------------*\
  |  main  --  set up the global vars & run the z80
 \*-----------------------------------------------------------------------*/
+
+
 
 int
 main(int argc, const char *argv[])
@@ -1191,20 +1225,8 @@ main(int argc, const char *argv[])
     if (z80 == NULL)
         return -1;
 
-#ifdef SYSTEM_POLL
-    system_init( z80 );
-#endif
-
-    z_initterm();
-
-#ifdef EXTERNAL_IO
-    io_init( z80 );
-#endif
-#ifdef EXTERNAL_MEM
-    mem_init( z80 );
-#endif
+	Full_Z80Reset( z80, 1 );
     
-
 #if defined BeBox_TurnedOff
     /* try to open the keyboard for non-blocking read */
     keybd = dup(0);        /* dup stdin */
@@ -1249,6 +1271,9 @@ main(int argc, const char *argv[])
 #endif
 #ifdef SIGINT
     signal(SIGINT, interrupt);
+#endif
+#ifdef SIGUSR1
+	signal(SIGUSR1, sigusr1);
 #endif
 
     z_setterm();
