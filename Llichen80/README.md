@@ -68,26 +68,32 @@ per the design of the Pageable ROM module
   	  write an $F0 to exit the emulation.
 
 
-# LlamaSuper - Console and Mass Storage Interface
+# LLMinTerm - Console and Mass Storage Interface
 
 For emulation, there are two parts of the entire system.  There's
 this half which runs as emulation, and there's a python program
-which will run ultimately on a raspberry pi, but also runs here.
-It is based on pyterm's tool "miniterm.py".
+that acts as a terminal interface, connecting to the serial port
+where the RC2014 is connected.  It is based on pyterm's tool
+"miniterm.py" and can connect to the emulator via a network socket,
+or to the actual device via serial port.
 
 For emulation, we run the Llichen 80 emulator with its 6850 console
 working with a socket interface running on port 6850, presenting
 the console on that IP port.
 
-For emulation, build this with the CFLAG of -DMC6850_SOCKET.  Then
-connect to it with miniterm, like so:
+    # ~/bin/llichen80emu
 
-    python llminiterm.py socket://localhost:6850
+The emulator is built with the CFLAG of -DMC6850_SOCKET to enable
+the socket layer in the 6850 ACIA simulator.  You can then connect
+to it with miniterm, like so:
+
+    # python llminiterm.py socket://localhost:6850
 
 You should see the interface appearing over there as well as locally.
-Since this is a "good enough" interface, some things like emulator
-control itself is not implemented over the socket connection.  You 
-may need to manually kill the emulator or python or both.
+
+Note that this is a "good enough" interface, some things like
+emulator control itself is not implemented over the socket connection.
+You may need to manually kill the emulator or python or both.
 
 Do note that if the emulator cannot establish a socket on port 6850,
 it will advance to port 6851 and so on until it works, or until it
@@ -96,12 +102,20 @@ fails trying 15 consecutive ports. ;)
 In "real use", on a raspberry pi, the python program will be run
 like so:
 
-    python llminiterm.py /dev/serial0 115200
+    # python llminiterm.py /dev/serial0 115200
 
 Be sure to have your "LL" directory in your home directory.  The
 ROM for the emulator as well as the other support files will be
 served out from there.
 
+The Emulator also recently added a hook to listen for unix signal
+SIGUSR1, which now will perform a hard reset of the RC2014 in
+emulation.  For the Llichen80 emulator, this will also switch 
+all of the RAM/ROM banking back to the poweron state with ROM 
+in the lower half of memory space.
+
+On the actual raspberry pi interface, "toggling reset" is performed
+by pulling GPIO 18 down to ground for a second, then releasing it.
 
 
 # The following are not accurate yet.
