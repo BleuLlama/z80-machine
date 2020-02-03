@@ -6,8 +6,7 @@ TARG := llichen80emu
 include ../Common/defs.mak
 
 # additional defs
-CFLAGS += -DAUTORUN -DRESET_HANDLER 
-# -DMC6850_SOCKET
+CFLAGS += -DAUTORUN -DRESET_HANDLER -DMC6850_SOCKET
 # no -DFILTER_CONSOLE
 
 SRCS += $(SRC)/filter.c

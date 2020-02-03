@@ -98,6 +98,8 @@ void Socks_Init()
 
 	listen(sock.sockfd,5);
 	sock.clilen = sizeof(sock.cli_addr);
+
+	// this will block on waiting...
 	sock.newsockfd = accept( sock.sockfd,
 						(struct sockaddr *) &sock.cli_addr,
 						&sock.clilen );
