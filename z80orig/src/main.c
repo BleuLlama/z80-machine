@@ -1310,6 +1310,15 @@ main(int argc, const char *argv[])
         EventRecord ev;
         WaitNextEvent(0, &ev, 0, nil);
 #endif
+
+#ifdef NICE_CPU
+        usleep( NICE_CPU );
+#endif
+
+#ifdef CYCLES_PER_LOOP
+        z80_emulator(z80, CYCLES_PER_LOOP);
+#else
         z80_emulator(z80, 100000);
+#endif
     }
 }
