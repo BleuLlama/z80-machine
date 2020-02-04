@@ -30,18 +30,18 @@ These examples are written with the TMS board configured like a
 
 Locations:
 
-     ________________________________________
-    / JP1  JP2                 J4            |
-   /                                     JP4 |
-   | J6                                      |
-   |                     J7                  |
-   |                                         |
-   |                                         |
-   |                                         |
-   |                                         |
-   ------------------------------------------
-    ||||||||||||||||||||||||||||||||||||||||
-    1                                      40
+      ________________________________________
+     / JP1  JP2                 J4            |
+    /                                     JP4 |
+    | J6                                      |
+    |                     J7                  |
+    |                                         |
+    |                                         |
+    |                                         |
+    |                                         |
+    ------------------------------------------
+     ||||||||||||||||||||||||||||||||||||||||
+     1                                      40
 
 - J7 is not used, as it is the clock signal header.
 
@@ -53,10 +53,10 @@ card at addresses 10 and 11. (0x16, 0x17).  Here are the
 pin configurations: ("#" indicates the position of the jumper,
 while "." or ":" indicates open pins.
 
-   JP1  JP2  J6       J4     JP4
-    .    .                    .
-    #    #   ::#   #:::::::   #
-    #    #         02468ACE   #
+    JP1  JP2  J6       J4     JP4
+     .    .                    .
+     #    #   ::#   #:::::::   #
+     #    #         02468ACE   #
 
 Configured as 0x10, 0x11
 
@@ -72,10 +72,10 @@ Configured as 0x10, 0x11
 We're not using ColecoVision configuration, but here it is
 anyway, for completeness-sake...
 
-   JP1  JP2  J6       J4     JP4
-    .    .                    .
-    #    #   ::#   :::::#::   #
-    #    #         02468ACE   #
+    JP1  JP2  J6       J4     JP4
+     .    .                    .
+     #    #   ::#   :::::#::   #
+     #    #         02468ACE   #
 
 Configured as 0xBE, 0xBF
 
@@ -89,10 +89,10 @@ Configured as 0xBE, 0xBF
 
 ## MSX
 
-   JP1  JP2  J6       J4     JP4
-    #    #                    #
-    #    #   ::#   ::::#:::   #
-    .    .         02468ACE   .
+    JP1  JP2  J6       J4     JP4
+     #    #                    #
+     #    #   ::#   ::::#:::   #
+     .    .         02468ACE   .
 
 Configured as 0x98, 0x99
 
@@ -101,4 +101,3 @@ Configured as 0x98, 0x99
 - J6 (bit 4) right - upper half of port range of J4 (B0-BF)
 - J4 (bits 7-5) - Port range A0-BF
 - JP4 (interrupt) upper - INT
-
