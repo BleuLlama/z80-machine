@@ -21,10 +21,42 @@
 MemRegion mems[] = 
 {
     /* 0x1000 = 4kbytes */
-    { 0x0000, (8 * 1024), REGION_RO, REGION_ACTIVE, NULL, "ROMs/basic32.rom" },
+    // PAGEABLE BASIC ROM MODULE
+    { 0x0000, (8 * 1024),  REGION_RO, REGION_ACTIVE, NULL, "ROMs/basic32.rom" },
+
+    // 64k RAM MODULE
+    { 0x0000, (32 * 1024), REGION_RW, REGION_INACTIVE, NULL, NULL },
     { 0x8000, (32 * 1024), REGION_RW, REGION_ACTIVE, NULL, NULL },
     REGION_END
 };
+
+
+/* lowmem_page
+    changes the lowmem to something different.
+
+    if val == 0, then it will force it back to ROM
+    otherwise, it will toggle between ROM and RAM
+*/
+void lowmem_page( const byte val )
+{
+    if( val == 0 ) {
+        mems[0].active = REGION_ACTIVE;
+        mems[1].active = REGION_INACTIVE;
+        return;
+    }
+
+    // otherwise toggle it!
+    if( mems[0].active == REGION_ACTIVE ) {
+        mems[0].active = REGION_INACTIVE;
+        mems[1].active = REGION_ACTIVE;
+
+    } else {
+        mems[0].active = REGION_ACTIVE;
+        mems[1].active = REGION_INACTIVE;
+
+    }
+}
+
 
 
 /* ********************************************************************** */
@@ -35,6 +67,8 @@ void system_init( z80info * z80 )
 {
     /* Emulation info and credits */
     printf( "Emulation of the RC2014 system\n" );
+    printf( " - Digital IO Module at 0x00\n" );
+    printf( " - Pageable ROM at 0x38\n" );
     printf( "    version %s\n", RC2014_VERSION );
     printf( "  RC2014 by Spencer Owen\n" );
     printf( "  SBC by Grant Searle\n" );
@@ -55,8 +89,8 @@ void system_poll( z80info * z80 )
 
     if( FromConsoleBuffer_Available() ) 
     {
-	INTR = 1; /* for IM 1 support only */
-	EVENT = TRUE;
+    	INTR = 1; /* for IM 1 support only */
+    	EVENT = TRUE;
     }
 }
 
@@ -65,8 +99,25 @@ void system_poll( z80info * z80 )
 /*  -DEXTERNAL_IO */
 /* Port IO */
 
+/* digital IO simulation */
+void myHandlePortWrite38( const byte data )
+{
+    lowmem_page( 1 );   // toggle ROM <--> RAM
+    regions_display( mems );
+}
+
+/*  -DRESET_HANDLER */
+
+void reset_handle( z80info *z80 )
+{
+    // in a reset, it will force it back to ROM
+    lowmem_page( 0 );
+    regions_display( mems );
+}
+
 
 byte HandleEmulationSignature( void ) { return 'A'; }
+
 
 
 /* Z80 "OUT" instruction calls this if EXTERNAL_IO is defined */
@@ -111,6 +162,9 @@ void io_init( z80info * z80 )
     readPorts[ 0x01 ] = HandlePortRead01;
     readPorts[ 0x02 ] = HandlePortRead02;
     readPorts[ 0x03 ] = HandlePortRead03;
+
+    /* Pageable ROM */
+    writePorts[ 0x38 ] = myHandlePortWrite38;
 
     /* Serial IO card */
     writePorts[ kMC6850PortTxData ] = mc6850_out_to_console_data;

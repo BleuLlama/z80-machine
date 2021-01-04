@@ -12,9 +12,15 @@
 #define __RC2014_H__
 
 
-#define RC2014_VERSION	"1.02  2017-02-15"
+#define RC2014_VERSION	"1.03  2021-01-03"
 
 /* Version info
+
+ 1.03   2021-01-03  SDL
+    Updated the base RC2014 emulation to have:
+    - Pageable ROM module at 0x38
+    - 64k RAM module, pageing with ROM
+
  1.02 	2017-02-xx  SDL
 	Reworded console function names
 	Working on backchannel

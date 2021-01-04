@@ -6,7 +6,7 @@ TARG := rc2014
 include ../Common/defs.mak
 
 # additional defs
-CFLAGS += 
+CFLAGS += -DRESET_HANDLER
 SRCS += 
 
 
